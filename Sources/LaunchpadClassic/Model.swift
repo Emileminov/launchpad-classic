@@ -80,6 +80,8 @@ final class LaunchModel: ObservableObject {
     @Published var folderHidden = false
     @Published var mergeTarget: String?
     @Published var editMode = false
+    @Published var pendingDelete: String?
+    @Published var deleteError: String?
     @Published var focusTick = 0
     @Published var draggingID: String? {
         didSet {
@@ -171,6 +173,8 @@ final class LaunchModel: ObservableObject {
         openFolderID = nil
         folderHidden = false
         editMode = false
+        pendingDelete = nil
+        deleteError = nil
         draggingID = nil
     }
 
@@ -209,8 +213,7 @@ final class LaunchModel: ObservableObject {
     func isDeletable(_ path: String) -> Bool {
         let home = NSHomeDirectory() + "/Applications/"
         guard path.hasPrefix("/Applications/") || path.hasPrefix(home) else { return false }
-        return !path.hasSuffix("/LaunchpadClassic.app") && !path.hasSuffix("/Launchpad Classic.app")
-            && FileManager.default.isDeletableFile(atPath: path)
+        return !path.hasSuffix("/Launchpad Classic.app")
     }
 
     // MARK: Actions
@@ -236,21 +239,28 @@ final class LaunchModel: ObservableObject {
     }
 
     func requestDelete(_ path: String) {
-        guard let info = catalog[path] else { return }
-        let alert = NSAlert()
-        alert.messageText = "Удалить «\(info.name)»?"
-        alert.informativeText = "Приложение будет перемещено в Корзину."
-        alert.addButton(withTitle: "Удалить")
-        alert.addButton(withTitle: "Отмена")
-        let handler: (NSApplication.ModalResponse) -> Void = { [weak self] r in
-            guard r == .alertFirstButtonReturn else { return }
-            NSWorkspace.shared.recycle([URL(fileURLWithPath: path)]) { _, error in
-                DispatchQueue.main.async {
-                    if error == nil { self?.reload() }
+        deleteError = nil
+        pendingDelete = path
+    }
+
+    func cancelDelete() {
+        pendingDelete = nil
+        deleteError = nil
+    }
+
+    func confirmDelete() {
+        guard let path = pendingDelete else { return }
+        NSWorkspace.shared.recycle([URL(fileURLWithPath: path)]) { [weak self] _, error in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                if let error {
+                    self.deleteError = "Не получилось: \(error.localizedDescription)"
+                } else {
+                    self.pendingDelete = nil
+                    self.reload()
                 }
             }
         }
-        if let w = NSApp.keyWindow { alert.beginSheetModal(for: w, completionHandler: handler) } else { handler(alert.runModal()) }
     }
 
     func renameFolder(_ id: String, _ name: String) {

@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let model = LaunchModel()
     private var window: LaunchWindow!
     private var isShown = false
+    private var optionEdit = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -64,6 +65,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func show() {
         let screen = NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) } ?? NSScreen.main ?? NSScreen.screens[0]
         window.setFrame(screen.frame, display: true)
+        optionEdit = false
         model.resetForShow()
         model.reload()
         NSApp.presentationOptions = [.hideDock, .hideMenuBar]
@@ -81,6 +83,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func hide() {
         guard isShown else { return }
         isShown = false
+        model.editMode = false
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = 0.15
             window.animator().alphaValue = 0
@@ -139,8 +142,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case .keyDown: return self.handleKey(e)
             case .scrollWheel: return self.model.handleScroll(e) ? nil : e
             case .flagsChanged:
-                let opt = e.modifierFlags.contains(.option)
-                if opt != self.model.editMode, self.model.draggingID == nil { self.model.editMode = opt }
+                let f = e.modifierFlags
+                let opt = f.contains(.option) && !f.contains(.control) && !f.contains(.command)
+                if opt != self.optionEdit {
+                    self.optionEdit = opt
+                    if self.model.draggingID == nil, self.model.pendingDelete == nil { self.model.editMode = opt }
+                }
                 return e
             default:
                 if self.model.draggingID != nil { DispatchQueue.main.async { self.model.draggingID = nil } }
@@ -152,7 +159,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func handleKey(_ e: NSEvent) -> NSEvent? {
         switch Int(e.keyCode) {
         case kVK_Escape:
-            if model.openFolderID != nil { model.openFolderID = nil }
+            if model.pendingDelete != nil { model.cancelDelete() }
+            else if model.openFolderID != nil { model.openFolderID = nil }
             else if model.editMode { model.editMode = false }
             else if !model.query.isEmpty { model.query = "" }
             else { hide() }

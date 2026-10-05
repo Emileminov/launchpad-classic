@@ -43,6 +43,11 @@ struct RootView: View {
                     }
                 }
 
+                if let p = model.pendingDelete, let info = model.catalog[p] {
+                    DeleteDialog(model: model, path: p, name: info.name)
+                        .transition(.opacity)
+                }
+
                 if let f = model.openFolder {
                     FolderOverlay(model: model, folder: f)
                         .opacity(model.folderHidden ? 0 : 1)
@@ -184,7 +189,6 @@ struct TileView: View {
     let item: Item
     let metrics: GridMetrics
     var containerFolder: String? = nil
-    @State private var jig = false
 
     var body: some View {
         VStack(spacing: 6) {
@@ -198,7 +202,7 @@ struct TileView: View {
                 .lineLimit(1)
                 .frame(width: metrics.cell.width - 12)
         }
-        .rotationEffect(.degrees(model.editMode ? (jig ? 2 : -2) : 0))
+        .modifier(Jiggle(active: model.editMode, seed: Double(abs(item.id.hashValue) % 100)))
         .frame(width: metrics.cell.width, height: metrics.cell.height)
         .opacity(model.draggingID == item.id ? 0.35 : 1)
         .contentShape(Rectangle())
@@ -214,16 +218,6 @@ struct TileView: View {
         }
         .onDrop(of: [.plainText], delegate: TileDrop(model: model, target: item.id, metrics: metrics, folder: containerFolder))
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: model.mergeTarget)
-        .onChange(of: model.editMode) { _, on in
-            if on {
-                jig = false
-                DispatchQueue.main.asyncAfter(deadline: .now() + .random(in: 0...0.1)) {
-                    withAnimation(.easeInOut(duration: 0.13).repeatForever(autoreverses: true)) { jig = true }
-                }
-            } else {
-                withAnimation(.easeOut(duration: 0.1)) { jig = false }
-            }
-        }
         .contextMenu {
             switch item {
             case .app(let p):
@@ -237,14 +231,16 @@ struct TileView: View {
 
     @ViewBuilder private var deleteBadge: some View {
         if model.editMode, case .app(let p) = item, model.isDeletable(p) {
-            Image(systemName: "xmark")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(width: 24, height: 24)
-                .background(Circle().fill(Color(white: 0.25)))
-                .overlay(Circle().stroke(.white.opacity(0.4), lineWidth: 0.5))
-                .offset(x: -8, y: -8)
-                .onTapGesture { model.requestDelete(p) }
+            Button { model.requestDelete(p) } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 24, height: 24)
+                    .background(Circle().fill(Color(white: 0.25)))
+                    .overlay(Circle().stroke(.white.opacity(0.4), lineWidth: 0.5))
+            }
+            .buttonStyle(.plain)
+            .offset(x: -8, y: -8)
         }
     }
 }
@@ -372,5 +368,51 @@ struct BackdropDrop: DropDelegate {
     func performDrop(info: DropInfo) -> Bool {
         model.draggingID = nil
         return true
+    }
+}
+
+
+struct Jiggle: ViewModifier {
+    let active: Bool
+    let seed: Double
+
+    func body(content: Content) -> some View {
+        TimelineView(.animation(paused: !active)) { ctx in
+            let t = ctx.date.timeIntervalSinceReferenceDate
+            content.rotationEffect(.degrees(active ? sin(t * 28 + seed) * 1.8 : 0))
+        }
+    }
+}
+
+struct DeleteDialog: View {
+    @ObservedObject var model: LaunchModel
+    let path: String
+    let name: String
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.45)
+                .contentShape(Rectangle())
+                .onTapGesture { model.cancelDelete() }
+            VStack(spacing: 14) {
+                Image(nsImage: IconCache.icon(path)).resizable().frame(width: 64, height: 64)
+                Text("Удалить «\(name)»?").font(.system(size: 17, weight: .semibold)).foregroundStyle(.white)
+                Text(model.deleteError ?? "Приложение будет перемещено в Корзину.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(model.deleteError == nil ? .white.opacity(0.7) : Color.red)
+                    .multilineTextAlignment(.center)
+                    .frame(width: 280)
+                HStack(spacing: 12) {
+                    Button("Отмена") { model.cancelDelete() }
+                        .keyboardShortcut(.cancelAction)
+                    Button("Удалить") { model.confirmDelete() }
+                        .keyboardShortcut(.defaultAction)
+                }
+                .controlSize(.large)
+            }
+            .padding(28)
+            .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(.ultraThickMaterial))
+            .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(.white.opacity(0.15), lineWidth: 0.5))
+        }
     }
 }
