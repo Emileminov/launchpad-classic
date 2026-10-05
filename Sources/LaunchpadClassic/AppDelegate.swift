@@ -179,7 +179,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         switch Int(e.keyCode) {
         case kVK_Escape:
             if model.pendingDelete != nil { model.cancelDelete() }
-            else if model.openFolderID != nil { model.openFolderID = nil }
+            else if model.openFolderID != nil { model.closeFolder() }
             else if model.editMode { model.editMode = false }
             else if !model.query.isEmpty { model.query = "" }
             else { hide() }

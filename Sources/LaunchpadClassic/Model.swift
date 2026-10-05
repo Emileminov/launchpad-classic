@@ -106,6 +106,7 @@ final class LaunchModel: ObservableObject {
     }
     @Published var page = 0
     @Published var openFolderID: String?
+    @Published var folderOpen = false
     @Published var mergeTarget: String?
     @Published var editMode = false
     @Published var pendingDelete: String?
@@ -135,6 +136,7 @@ final class LaunchModel: ObservableObject {
     var folderGrid = CGRect.zero
     var folderPanel = CGRect.zero
     var folderCols = 1
+    var folderAnchor = CGPoint.zero
     var dragContainer: String?
     var mousePoint: () -> CGPoint = { .zero }
     private var dragTimer: Timer?
@@ -212,6 +214,7 @@ final class LaunchModel: ObservableObject {
         page = 0
         pager.dragOffset = 0
         openFolderID = nil
+        folderOpen = false
         editMode = false
         pendingDelete = nil
         deleteError = nil
@@ -263,17 +266,36 @@ final class LaunchModel: ObservableObject {
 
     func activate(_ item: Item) {
         if editMode {
-            if case .folder(let f) = item { openFolderID = f.id }
+            if case .folder(let f) = item { openFolder(f.id) }
             return
         }
         switch item {
         case .app(let p): launch(p)
-        case .folder(let f): openFolderID = f.id
+        case .folder(let f): openFolder(f.id)
         }
     }
 
     func setVisible(_ v: Bool) {
         withAnimation(.easeInOut(duration: 0.32)) { visible = v }
+    }
+
+    func openFolder(_ id: String) {
+        if let idx = items.firstIndex(where: { $0.id == id }) {
+            folderAnchor = layout.slotCenter(max(0, idx - page * pageSize))
+        }
+        folderOpen = false
+        openFolderID = id
+        DispatchQueue.main.async {
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) { self.folderOpen = true }
+        }
+    }
+
+    func closeFolder() {
+        guard let id = openFolderID else { return }
+        withAnimation(.spring(response: 0.36, dampingFraction: 0.92)) { folderOpen = false }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.34) {
+            if self.openFolderID == id && !self.folderOpen { self.openFolderID = nil }
+        }
     }
 
     func launch(_ path: String) {
@@ -287,7 +309,7 @@ final class LaunchModel: ObservableObject {
 
     func backgroundTap() {
         if pendingDelete != nil { cancelDelete() }
-        else if openFolderID != nil { openFolderID = nil }
+        else if openFolderID != nil { closeFolder() }
         else if editMode { editMode = false }
         else { close() }
     }
@@ -513,7 +535,7 @@ final class LaunchModel: ObservableObject {
         withAnimation(Self.spring) { items = new }
         dragContainer = nil
         hoverKey = nil
-        withAnimation(.easeOut(duration: 0.22)) { openFolderID = nil }
+        closeFolder()
     }
 
     private func tickFolder(_ fid: String, _ id: String, _ p: CGPoint) {

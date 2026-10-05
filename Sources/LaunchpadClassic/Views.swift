@@ -36,6 +36,8 @@ struct RootView: View {
                     pager(w: w, gridH: gridH, metrics: metrics)
                     dots.frame(height: 60)
                 }
+                .blur(radius: model.folderOpen ? 7 : 0)
+                .scaleEffect(model.folderOpen ? 0.96 : 1)
 
                 if let p = model.pendingDelete, let info = model.catalog[p] {
                     DeleteDialog(model: model, path: p, name: info.name)
@@ -43,8 +45,7 @@ struct RootView: View {
                 }
 
                 if let f = model.openFolder {
-                    FolderOverlay(model: model, folder: f)
-                        .transition(.opacity.combined(with: .scale(scale: 0.92)))
+                    FolderOverlay(model: model, folder: f, screen: geo.size)
                 }
                 }
                 .scaleEffect(model.visible ? 1 : (model.launching == nil ? 1.12 : 1.4))
@@ -53,7 +54,6 @@ struct RootView: View {
                 FloatingIcon(drag: model.drag, item: model.draggingItem, size: metrics.icon)
             }
             .coordinateSpace(name: "root")
-            .animation(.easeOut(duration: 0.2), value: model.openFolderID)
             .onAppear { model.pageWidth = w; model.pageSize = cols * rows; searchFocused = true }
             .onChange(of: w) { _, v in model.pageWidth = v }
             .onChange(of: model.focusTick) { _, _ in searchFocused = true }
@@ -215,16 +215,19 @@ struct TileView: View {
     let item: Item
     let metrics: GridMetrics
     var containerFolder: String? = nil
+    @GestureState private var pressed = false
 
     var body: some View {
         let isLaunching = model.launching == item.id
         VStack(spacing: 6) {
             // кликабельна ТОЛЬКО сама иконка
             ItemIcon(item: item, size: metrics.icon)
-                .scaleEffect(model.mergeTarget == item.id ? 1.18 : 1)
+                .scaleEffect(model.mergeTarget == item.id ? 1.18 : (pressed ? 0.9 : 1))
+                .animation(.easeOut(duration: 0.12), value: pressed)
                 .overlay(alignment: .topLeading) { deleteBadge }
                 .contentShape(RoundedRectangle(cornerRadius: metrics.icon * 0.22, style: .continuous))
                 .onTapGesture { model.activate(item) }
+                .simultaneousGesture(DragGesture(minimumDistance: 0).updating($pressed) { _, s, _ in s = true })
                 .simultaneousGesture(LongPressGesture(minimumDuration: 0.8).onEnded { _ in
                     if model.draggingID == nil { model.editMode = true }
                 })
@@ -249,7 +252,7 @@ struct TileView: View {
                 .allowsHitTesting(false)
         }
         .scaleEffect(isLaunching ? 1.6 : 1)
-        .opacity(isLaunching ? 0 : (model.draggingID == item.id ? 0 : 1))
+        .opacity(isLaunching ? 0 : (model.draggingID == item.id ? 0 : ((model.openFolderID == item.id && model.folderOpen) ? 0 : 1)))
         .modifier(Jiggle(active: model.editMode, seed: Double(abs(item.id.hashValue) % 100)))
         // ячейка целиком нужна только для перетаскивания; клик мимо иконки закрывает Launchpad
         .frame(width: metrics.cell.width, height: metrics.cell.height)
@@ -277,6 +280,7 @@ struct TileView: View {
 struct FolderOverlay: View {
     @ObservedObject var model: LaunchModel
     let folder: Folder
+    let screen: CGSize
 
     private func report(_ f: CGRect, _ columns: Int) {
         model.folderGrid = f
@@ -289,10 +293,13 @@ struct FolderOverlay: View {
         let metrics = GridMetrics(cell: cell, icon: 78)
         let columns = min(max(folder.apps.count, 1), 5)
         let rowCount = Int(ceil(Double(folder.apps.count) / Double(columns)))
+        let open = model.folderOpen
+        let s: CGFloat = open ? 1 : 0.16
         ZStack {
-            Color.black.opacity(0.35)
+            // подложка не масштабируется — только плавно темнеет
+            Color.black.opacity(open ? 0.38 : 0)
                 .contentShape(Rectangle())
-                .onTapGesture { model.openFolderID = nil }
+                .onTapGesture { model.closeFolder() }
 
             VStack(spacing: 18) {
                 TextField("", text: Binding(get: { folder.name }, set: { model.renameFolder(folder.id, $0) }))
@@ -317,12 +324,22 @@ struct FolderOverlay: View {
                 })
             }
             .padding(40)
-            .background(RoundedRectangle(cornerRadius: 44, style: .continuous).fill(.ultraThinMaterial))
-            .overlay(RoundedRectangle(cornerRadius: 44, style: .continuous).stroke(.white.opacity(0.15), lineWidth: 0.5))
+            .background(
+                ZStack {
+                    RoundedRectangle(cornerRadius: 44, style: .continuous).fill(.ultraThinMaterial)
+                    RoundedRectangle(cornerRadius: 44, style: .continuous).fill(Color.black.opacity(0.28))
+                }
+            )
+            .overlay(RoundedRectangle(cornerRadius: 44, style: .continuous).stroke(.white.opacity(0.14), lineWidth: 0.5))
+            .shadow(color: .black.opacity(0.35), radius: 30, y: 12)
+            // панель вырастает из иконки папки
+            .scaleEffect(s)
+            .offset(x: (model.folderAnchor.x - screen.width / 2) * (1 - s),
+                    y: (model.folderAnchor.y - screen.height / 2) * (1 - s))
+            .opacity(open ? 1 : 0)
         }
     }
 }
-
 
 struct Jiggle: ViewModifier {
     let active: Bool
