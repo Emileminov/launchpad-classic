@@ -224,7 +224,6 @@ struct TileView: View {
             ItemIcon(item: item, size: metrics.icon)
                 .scaleEffect(model.mergeTarget == item.id ? 1.18 : (pressed ? 0.9 : 1))
                 .animation(.easeOut(duration: 0.12), value: pressed)
-                .overlay(alignment: .topLeading) { deleteBadge }
                 .contentShape(RoundedRectangle(cornerRadius: metrics.icon * 0.22, style: .continuous))
                 .onTapGesture { model.activate(item) }
                 .simultaneousGesture(DragGesture(minimumDistance: 0).updating($pressed) { _, s, _ in s = true })
@@ -243,6 +242,8 @@ struct TileView: View {
                         Button("Разобрать папку") { model.dissolve(f.id) }
                     }
                 }
+                // крестик — отдельный слой поверх иконки, со своей зоной нажатия
+                .overlay(alignment: .topLeading) { deleteBadge }
             Text(model.title(item))
                 .font(.system(size: 13))
                 .foregroundStyle(.white)
@@ -270,6 +271,7 @@ struct TileView: View {
                     .frame(width: 24, height: 24)
                     .background(Circle().fill(Color(white: 0.25)))
                     .overlay(Circle().stroke(.white.opacity(0.4), lineWidth: 0.5))
+                    .contentShape(Circle())
             }
             .buttonStyle(.plain)
             .offset(x: -8, y: -8)
