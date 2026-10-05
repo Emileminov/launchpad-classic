@@ -37,7 +37,12 @@ cat > "$OUT/Contents/Info.plist" <<PLIST
 </dict></plist>
 PLIST
 
-codesign --force --deep -s - "$OUT"
+if [ -n "$SIGN_ID" ]; then
+  # Developer ID + hardened runtime + timestamp — нужно для нотаризации
+  codesign --force --options runtime --timestamp --sign "$SIGN_ID" "$OUT"
+else
+  codesign --force --deep -s - "$OUT"
+fi
 mkdir -p "$HOME/Applications"
 pkill -x LaunchpadClassic 2>/dev/null || true
 rm -rf "$HOME/Applications/$NAME.app"
