@@ -27,6 +27,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         installHotKey()
         installMonitors()
         model.close = { [weak self] in self?.hide() }
+        model.mousePoint = { [weak self] in
+            guard let w = self?.window else { return .zero }
+            let p = w.mouseLocationOutsideOfEventStream
+            return CGPoint(x: p.x, y: w.frame.height - p.y)
+        }
         NotificationCenter.default.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
             self?.hide()
         }
@@ -76,7 +81,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         optionEdit = false
         model.resetForShow()
         model.reload()
-        NSApp.presentationOptions = [.hideDock, .hideMenuBar]
         showGen += 1
         NSApp.unhide(nil)
         let wp = NSWorkspace.shared.desktopImageURL(for: screen).flatMap { NSImage(contentsOf: $0) }
@@ -100,7 +104,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
             guard gen == self.showGen, !self.isShown else { return }
             self.window.orderOut(nil)
-            NSApp.presentationOptions = []
             NSApp.deactivate()
         }
     }
@@ -147,7 +150,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: Events
 
     private func installMonitors() {
-        NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .scrollWheel, .leftMouseUp, .leftMouseDown, .mouseMoved, .flagsChanged]) { [weak self] e in
+        NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .scrollWheel, .leftMouseUp, .leftMouseDragged, .flagsChanged]) { [weak self] e in
             guard let self, self.isShown else { return e }
             switch e.type {
             case .keyDown: return self.handleKey(e)
@@ -160,8 +163,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     if self.model.draggingID == nil, self.model.pendingDelete == nil { self.model.editMode = opt }
                 }
                 return e
+            case .leftMouseDragged:
+                self.model.dragMove()
+                return e
+            case .leftMouseUp:
+                if self.model.draggingID != nil { self.model.endDrag() }
+                return e
             default:
-                if self.model.draggingID != nil { DispatchQueue.main.async { self.model.draggingID = nil } }
                 return e
             }
         }

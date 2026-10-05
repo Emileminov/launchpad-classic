@@ -21,6 +21,8 @@ struct RootView: View {
             let gridH = max(300, h - 40 - 36 - 24 - 60)
             let cell = CGSize(width: gridW / CGFloat(cols), height: gridH / CGFloat(rows))
             let metrics = GridMetrics(cell: cell, icon: min(cell.width * 0.62, cell.height - 40, 150))
+            let _ = model.layout = GridLayout(w: w, gridLeft: (w - cell.width * CGFloat(cols)) / 2, gridTop: 100,
+                                              cell: cell, icon: metrics.icon, cols: cols, rows: rows)
 
             ZStack {
                 background(size: geo.size)
@@ -35,16 +37,6 @@ struct RootView: View {
                     dots.frame(height: 60)
                 }
 
-                if model.draggingID != nil && (model.openFolderID == nil || model.folderHidden) {
-                    HStack {
-                        Color.clear.frame(width: 60).contentShape(Rectangle())
-                            .onDrop(of: [.plainText], delegate: EdgeDrop(model: model, dir: -1))
-                        Spacer()
-                        Color.clear.frame(width: 60).contentShape(Rectangle())
-                            .onDrop(of: [.plainText], delegate: EdgeDrop(model: model, dir: 1))
-                    }
-                }
-
                 if let p = model.pendingDelete, let info = model.catalog[p] {
                     DeleteDialog(model: model, path: p, name: info.name)
                         .transition(.opacity)
@@ -52,14 +44,15 @@ struct RootView: View {
 
                 if let f = model.openFolder {
                     FolderOverlay(model: model, folder: f)
-                        .opacity(model.folderHidden ? 0 : 1)
-                        .allowsHitTesting(!model.folderHidden)
                         .transition(.opacity.combined(with: .scale(scale: 0.92)))
                 }
                 }
                 .scaleEffect(model.visible ? 1 : (model.launching == nil ? 1.12 : 1.4))
                 .opacity(model.visible ? 1 : 0)
+
+                FloatingIcon(drag: model.drag, item: model.draggingItem, size: metrics.icon)
             }
+            .coordinateSpace(name: "root")
             .animation(.easeOut(duration: 0.2), value: model.openFolderID)
             .onAppear { model.pageWidth = w; model.pageSize = cols * rows; searchFocused = true }
             .onChange(of: w) { _, v in model.pageWidth = v }
@@ -129,7 +122,6 @@ struct RootView: View {
             .frame(width: w, height: gridH, alignment: .leading)
             .contentShape(Rectangle())
             .onTapGesture { model.backgroundTap() }
-            .onDrop(of: [.plainText], delegate: PageDrop(model: model))
     }
 
     private var dots: some View {
@@ -144,6 +136,23 @@ struct RootView: View {
                         .onTapGesture { model.goTo(i) }
                 }
             }
+        }
+    }
+}
+
+struct FloatingIcon: View {
+    @ObservedObject var drag: DragState
+    let item: Item?
+    let size: CGFloat
+
+    var body: some View {
+        if let item {
+            ItemIcon(item: item, size: size)
+                .scaleEffect(drag.scale)
+                .shadow(color: .black.opacity(0.35), radius: 14, y: 8)
+                .opacity(drag.opacity)
+                .position(drag.point)
+                .allowsHitTesting(false)
         }
     }
 }
@@ -219,12 +228,9 @@ struct TileView: View {
                 .simultaneousGesture(LongPressGesture(minimumDuration: 0.8).onEnded { _ in
                     if model.draggingID == nil { model.editMode = true }
                 })
-                .onDrag {
-                    model.draggingID = item.id
-                    return NSItemProvider(object: item.id as NSString)
-                } preview: {
-                    ItemIcon(item: item, size: metrics.icon)
-                }
+                .simultaneousGesture(DragGesture(minimumDistance: 6).onChanged { _ in
+                    model.beginDrag(item.id, container: containerFolder)
+                })
                 .contextMenu {
                     switch item {
                     case .app(let p):
@@ -243,13 +249,12 @@ struct TileView: View {
                 .allowsHitTesting(false)
         }
         .scaleEffect(isLaunching ? 1.6 : 1)
-        .opacity(isLaunching ? 0 : (model.draggingID == item.id ? 0.35 : 1))
+        .opacity(isLaunching ? 0 : (model.draggingID == item.id ? 0 : 1))
         .modifier(Jiggle(active: model.editMode, seed: Double(abs(item.id.hashValue) % 100)))
         // ячейка целиком нужна только для перетаскивания; клик мимо иконки закрывает Launchpad
         .frame(width: metrics.cell.width, height: metrics.cell.height)
         .contentShape(Rectangle())
         .onTapGesture { model.backgroundTap() }
-        .onDrop(of: [.plainText], delegate: TileDrop(model: model, target: item.id, metrics: metrics, folder: containerFolder))
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: model.mergeTarget)
     }
 
@@ -273,6 +278,12 @@ struct FolderOverlay: View {
     @ObservedObject var model: LaunchModel
     let folder: Folder
 
+    private func report(_ f: CGRect, _ columns: Int) {
+        model.folderGrid = f
+        model.folderCols = columns
+        model.folderPanel = CGRect(x: f.minX - 40, y: f.minY - 40 - 54, width: f.width + 80, height: f.height + 80 + 54)
+    }
+
     var body: some View {
         let cell = CGSize(width: 140, height: 130)
         let metrics = GridMetrics(cell: cell, icon: 78)
@@ -282,7 +293,6 @@ struct FolderOverlay: View {
             Color.black.opacity(0.35)
                 .contentShape(Rectangle())
                 .onTapGesture { model.openFolderID = nil }
-                .onDrop(of: [.plainText], delegate: BackdropDrop(model: model))
 
             VStack(spacing: 18) {
                 TextField("", text: Binding(get: { folder.name }, set: { model.renameFolder(folder.id, $0) }))
@@ -297,101 +307,19 @@ struct FolderOverlay: View {
                             TileView(model: model, item: .app(p), metrics: metrics, containerFolder: folder.id)
                         }
                     }
+                    .animation(LaunchModel.spring, value: folder.apps)
                 }
                 .frame(width: cell.width * CGFloat(columns), height: cell.height * CGFloat(min(rowCount, 3)))
+                .background(GeometryReader { g in
+                    Color.clear
+                        .onAppear { report(g.frame(in: .named("root")), columns) }
+                        .onChange(of: folder.apps.count) { _, _ in report(g.frame(in: .named("root")), columns) }
+                })
             }
             .padding(40)
             .background(RoundedRectangle(cornerRadius: 44, style: .continuous).fill(.ultraThinMaterial))
             .overlay(RoundedRectangle(cornerRadius: 44, style: .continuous).stroke(.white.opacity(0.15), lineWidth: 0.5))
         }
-    }
-}
-
-// MARK: Drop delegates
-
-struct TileDrop: DropDelegate {
-    let model: LaunchModel
-    let target: String
-    let metrics: GridMetrics
-    let folder: String?
-
-    func validateDrop(info: DropInfo) -> Bool { model.draggingID != nil && model.query.isEmpty }
-
-    func dropEntered(info: DropInfo) { update(info) }
-
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        update(info)
-        return DropProposal(operation: .move)
-    }
-
-    func dropExited(info: DropInfo) {
-        if model.mergeTarget == target { model.mergeTarget = nil }
-        if model.hoverTarget == target { model.hoverTarget = nil }
-    }
-
-    func performDrop(info: DropInfo) -> Bool {
-        if let d = model.draggingID, model.mergeTarget == target { model.merge(d, into: target) }
-        model.mergeTarget = nil
-        model.draggingID = nil
-        return true
-    }
-
-    private func update(_ info: DropInfo) {
-        guard let d = model.draggingID, d != target else { return }
-        let p = info.location
-        let contentH = metrics.icon + 6 + 16
-        let iconCenterY = (metrics.cell.height - contentH) / 2 + metrics.icon / 2
-        let inCenter = abs(p.x - metrics.cell.width / 2) < metrics.icon * 0.3 && abs(p.y - iconCenterY) < metrics.icon * 0.32
-
-        if inCenter && folder == nil && model.isApp(d) {
-            if model.mergeTarget != target { model.mergeTarget = target }
-            return
-        }
-        if model.mergeTarget != nil { model.mergeTarget = nil }
-        guard model.hoverTarget != target else { return }
-        model.hoverTarget = target
-        let m = model, t = target, f = folder
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-            guard m.hoverTarget == t, m.mergeTarget == nil, let dragged = m.draggingID else { return }
-            m.hoverTarget = nil
-            if let f { m.moveInFolder(f, dragged, onto: t) } else { m.place(dragged, onto: t) }
-        }
-    }
-}
-
-struct PageDrop: DropDelegate {
-    let model: LaunchModel
-    func validateDrop(info: DropInfo) -> Bool { model.draggingID != nil && model.query.isEmpty }
-    func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: .move) }
-    func performDrop(info: DropInfo) -> Bool {
-        model.moveToEnd(ofPage: model.page)
-        model.draggingID = nil
-        return true
-    }
-}
-
-struct EdgeDrop: DropDelegate {
-    let model: LaunchModel
-    let dir: Int
-    func validateDrop(info: DropInfo) -> Bool { true }
-    func dropEntered(info: DropInfo) { model.startEdgeTimer(dir) }
-    func dropExited(info: DropInfo) { model.cancelEdgeTimer() }
-    func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: .move) }
-    func performDrop(info: DropInfo) -> Bool {
-        model.cancelEdgeTimer()
-        model.draggingID = nil
-        return true
-    }
-}
-
-struct BackdropDrop: DropDelegate {
-    let model: LaunchModel
-    func validateDrop(info: DropInfo) -> Bool { true }
-    func dropEntered(info: DropInfo) { if model.draggingID != nil { model.folderHidden = true } }
-    func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: .move) }
-    func performDrop(info: DropInfo) -> Bool {
-        model.draggingID = nil
-        return true
     }
 }
 
