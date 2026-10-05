@@ -5,6 +5,7 @@ import SwiftUI
 
 var hotKeyAction: (() -> Void)?
 
+
 final class LaunchWindow: NSWindow {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
@@ -73,6 +74,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.reload()
         NSApp.presentationOptions = [.hideDock, .hideMenuBar]
         showGen += 1
+        NSApp.unhide(nil)
         let wp = NSWorkspace.shared.desktopImageURL(for: screen).flatMap { NSImage(contentsOf: $0) }
         model.wallpaper = wp
         effectView.isHidden = wp != nil
@@ -95,7 +97,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard gen == self.showGen, !self.isShown else { return }
             self.window.orderOut(nil)
             NSApp.presentationOptions = []
-            NSApp.hide(nil)
+            NSApp.deactivate()
         }
     }
 
