@@ -36,7 +36,6 @@ struct RootView: View {
                     pager(w: w, gridH: gridH, metrics: metrics)
                     dots.frame(height: 60)
                 }
-                .blur(radius: model.folderOpen ? 7 : 0)
                 .scaleEffect(model.folderOpen ? 0.96 : 1)
 
                 if let f = model.openFolder {
@@ -114,6 +113,10 @@ struct RootView: View {
                 }
                 .animation(LaunchModel.spring, value: model.items)
                 .frame(width: w, height: gridH, alignment: .top)
+                // страница растеризуется в GPU-текстуру, поэтому размытие и анимации дешёвые
+                .drawingGroup()
+                // размываем только видимую страницу, остальные за экраном не трогаем
+                .blur(radius: (model.folderOpen && i == model.page) ? 7 : 0)
             }
         }
         .frame(width: w, alignment: .leading)
@@ -149,7 +152,7 @@ struct FloatingIcon: View {
         if let item {
             ItemIcon(item: item, size: size)
                 .scaleEffect(drag.scale)
-                .shadow(color: .black.opacity(0.35), radius: 14, y: 8)
+                .shadow(color: .black.opacity(0.35 * drag.shadow), radius: 14 * drag.shadow, y: 8 * drag.shadow)
                 .opacity(drag.opacity)
                 .position(drag.point)
                 .allowsHitTesting(false)
@@ -217,6 +220,11 @@ struct TileView: View {
     var containerFolder: String? = nil
     @GestureState private var pressed = false
 
+    private var labelWidth: CGFloat {
+        let w = NSAttributedString(string: model.title(item), attributes: [.font: NSFont.systemFont(ofSize: 13)]).size().width
+        return min(ceil(w) + 4, metrics.cell.width - 12)
+    }
+
     var body: some View {
         let isLaunching = model.launching == item.id
         let vis: CGRect = {
@@ -248,13 +256,15 @@ struct TileView: View {
                 }
                 // крестик — отдельный слой поверх иконки, со своей зоной нажатия
                 .overlay(alignment: .topLeading) { deleteBadge(vis) }
+            // подпись тоже кликабельна — зона ровно по ширине текста
             Text(model.title(item))
                 .font(.system(size: 13))
                 .foregroundStyle(.white)
                 .shadow(color: .black.opacity(0.55), radius: 2, y: 1)
                 .lineLimit(1)
-                .frame(maxWidth: metrics.cell.width - 12)
-                .allowsHitTesting(false)
+                .frame(width: labelWidth)
+                .contentShape(Rectangle())
+                .onTapGesture { model.activate(item) }
         }
         .scaleEffect(isLaunching ? 1.6 : 1)
         .opacity(isLaunching ? 0 : (model.draggingID == item.id ? 0 : ((model.openFolderID == item.id && model.folderOpen) ? 0 : 1)))

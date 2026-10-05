@@ -118,6 +118,7 @@ final class DragState: ObservableObject {
     @Published var point: CGPoint = .zero
     @Published var scale: CGFloat = 1
     @Published var opacity: Double = 1
+    @Published var shadow: Double = 0
 }
 
 struct GridLayout {
@@ -167,6 +168,7 @@ final class LaunchModel: ObservableObject {
                 dragContainer = nil
                 drag.opacity = 1
                 drag.scale = 1
+                drag.shadow = 0
             }
         }
     }
@@ -513,7 +515,7 @@ final class LaunchModel: ObservableObject {
         edgeSince = nil
         forceReorder = false
         draggingID = id
-        withAnimation(.spring(response: 0.28, dampingFraction: 0.62)) { drag.scale = 1.16 }
+        withAnimation(.spring(response: 0.28, dampingFraction: 0.62)) { drag.scale = 1.16; drag.shadow = 1 }
         dragTimer?.invalidate()
         dragTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30, repeats: true) { [weak self] _ in self?.dragTick() }
     }
@@ -637,12 +639,14 @@ final class LaunchModel: ObservableObject {
         }
         mergeTarget = nil
         save()
-        withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
+        // иконка «садится» на место, тень уходит плавно вместе с этим
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
             if let d = dest { drag.point = d }
             drag.scale = shrink ? 0.4 : 1
+            drag.shadow = 0
             if shrink { drag.opacity = 0 }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.32) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.34) { [weak self] in
             if self?.draggingID == id { self?.draggingID = nil }
         }
     }
