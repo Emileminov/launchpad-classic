@@ -1,6 +1,5 @@
 import AppKit
 import Carbon.HIToolbox
-import ServiceManagement
 import SwiftUI
 
 var hotKeyAction: (() -> Void)?
@@ -151,22 +150,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         main.addItem(appItem)
         let menu = NSMenu()
         menu.addItem(withTitle: "Показать Launchpad", action: #selector(toggle), keyEquivalent: "").target = self
-        let login = NSMenuItem(title: "Запускать при входе", action: #selector(toggleLogin(_:)), keyEquivalent: "")
-        login.target = self
-        login.state = SMAppService.mainApp.status == .enabled ? .on : .off
-        menu.addItem(login)
         menu.addItem(.separator())
         menu.addItem(withTitle: "Выйти", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = menu
         NSApp.mainMenu = main
-    }
-
-    @objc private func toggleLogin(_ sender: NSMenuItem) {
-        do {
-            if SMAppService.mainApp.status == .enabled { try SMAppService.mainApp.unregister() }
-            else { try SMAppService.mainApp.register() }
-        } catch {}
-        sender.state = SMAppService.mainApp.status == .enabled ? .on : .off
     }
 
     // MARK: Hot key  (⌃⌥Space)
