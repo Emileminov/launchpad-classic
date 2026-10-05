@@ -32,13 +32,13 @@ let colors: [(NSColor, NSColor)] = [
     (rgb(80, 175, 255),  rgb(20, 110, 235)),  // синий
     (rgb(100, 225, 190), rgb(40, 190, 150)),  // бирюзовый
 ]
-let cell: CGFloat = 170, gap: CGFloat = 40
+let cell: CGFloat = 149, gap: CGFloat = 52
 let total = cell * 3 + gap * 2
 let x0 = S/2 - total/2, yTop = S/2 + total/2
 for i in 0..<9 {
     let r = i / 3, c = i % 3
     let rect = CGRect(x: x0 + CGFloat(c) * (cell + gap), y: yTop - CGFloat(r + 1) * cell - CGFloat(r) * gap, width: cell, height: cell)
-    let p = NSBezierPath(roundedRect: rect, xRadius: 42, yRadius: 42)
+    let p = NSBezierPath(roundedRect: rect, xRadius: 34, yRadius: 34)
     ctx.saveGState()
     ctx.setShadow(offset: CGSize(width: 0, height: -5), blur: 9, color: NSColor.black.withAlphaComponent(0.22).cgColor)
     colors[i].1.setFill(); p.fill()

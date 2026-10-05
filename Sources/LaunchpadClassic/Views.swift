@@ -71,12 +71,15 @@ struct RootView: View {
                     .scaledToFill()
                     .frame(width: size.width, height: size.height)
                     .clipped()
-                    .scaleEffect(1.05)
-                    .blur(radius: 16)
+                    .scaleEffect(1.08)
+                    .blur(radius: 30)
                     .frame(width: size.width, height: size.height)
                     .clipped()
             }
-            Color.black.opacity(model.wallpaper == nil ? 0.3 : 0.2)
+            // графит: тёмно-серый с едва заметным намёком на обои
+            LinearGradient(colors: [Color(red: 0.20, green: 0.21, blue: 0.23), Color(red: 0.13, green: 0.14, blue: 0.15)],
+                           startPoint: .top, endPoint: .bottom)
+                .opacity(model.wallpaper == nil ? 1 : 0.88)
         }
     }
 
