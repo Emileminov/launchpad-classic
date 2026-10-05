@@ -113,8 +113,6 @@ struct RootView: View {
                 }
                 .animation(LaunchModel.spring, value: model.items)
                 .frame(width: w, height: gridH, alignment: .top)
-                // размываем только видимую страницу, остальные за экраном не трогаем
-                .blur(radius: (model.folderOpen && i == model.page) ? 7 : 0)
             }
         }
         .frame(width: w, alignment: .leading)
