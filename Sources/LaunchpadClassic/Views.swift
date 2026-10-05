@@ -113,8 +113,6 @@ struct RootView: View {
                 }
                 .animation(LaunchModel.spring, value: model.items)
                 .frame(width: w, height: gridH, alignment: .top)
-                // страница растеризуется в GPU-текстуру, поэтому размытие и анимации дешёвые
-                .drawingGroup()
                 // размываем только видимую страницу, остальные за экраном не трогаем
                 .blur(radius: (model.folderOpen && i == model.page) ? 7 : 0)
             }
