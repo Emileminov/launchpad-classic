@@ -75,7 +75,7 @@ struct RootView: View {
                     .frame(width: size.width, height: size.height)
                     .clipped()
             }
-            Color.black.opacity(model.wallpaper == nil ? 0.3 : 0.2)
+            Color.black.opacity(model.wallpaper == nil ? 0.2 : 0.2)
         }
     }
 

@@ -59,7 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         w.isReleasedWhenClosed = false
 
         let effect = NSVisualEffectView()
-        effect.material = .hudWindow
+        effect.material = .fullScreenUI
         effect.blendingMode = .behindWindow
         effect.state = .active
         effectView = effect
@@ -83,12 +83,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.reload()
         showGen += 1
         NSApp.unhide(nil)
-        let wp = NSWorkspace.shared.desktopImageURL(for: screen).flatMap { NSImage(contentsOf: $0) }
-        model.wallpaper = wp
-        effectView.isHidden = wp != nil
+        // Фон — системное стекло «насквозь»: всегда показывает актуальные обои
+        // (в том числе динамические и аэро-заставки, у которых нет файла-картинки).
+        model.wallpaper = nil
+        effectView.isHidden = false
         model.visible = false
-        window.alphaValue = 1
+        window.alphaValue = 0
         window.makeKeyAndOrderFront(nil)
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.25
+            window.animator().alphaValue = 1
+        }
         NSApp.activate(ignoringOtherApps: true)
         isShown = true
         model.focusTick += 1
@@ -101,6 +106,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.editMode = false
         let gen = showGen
         model.setVisible(false)
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.35
+            window.animator().alphaValue = 0
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
             guard gen == self.showGen, !self.isShown else { return }
             self.window.orderOut(nil)
