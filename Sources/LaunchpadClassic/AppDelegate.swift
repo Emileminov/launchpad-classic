@@ -17,30 +17,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var optionEdit = false
     private var effectView: NSVisualEffectView!
     private var showGen = 0
-    private var launchedAtLogin = false
-
-    func applicationWillFinishLaunching(_ notification: Notification) {
-        // Запуск при входе в систему / восстановление приложений после перезагрузки:
-        // тогда Launchpad не должен выскакивать сам, он ждёт клика по значку или ⌃⌥Space.
-        if let ev = NSAppleEventManager.shared().currentAppleEvent,
-           ev.eventID == AEEventID(kAEOpenApplication),
-           let prop = ev.paramDescriptor(forKeyword: AEKeyword(keyAEPropData)),
-           prop.enumCodeValue == OSType(keyAELaunchedAsLogInItem) {
-            launchedAtLogin = true
-        }
-        // Страховка: первые минуты после загрузки системы или явный флаг --background
-        if Self.secondsSinceBoot() < 120 || CommandLine.arguments.contains("--background") {
-            launchedAtLogin = true
-        }
-    }
-
-    /// Время с загрузки системы, включая сон (systemUptime сон не учитывает).
-    private static func secondsSinceBoot() -> TimeInterval {
-        var tv = timeval()
-        var size = MemoryLayout<timeval>.stride
-        guard sysctlbyname("kern.boottime", &tv, &size, nil, 0) == 0 else { return .infinity }
-        return Date().timeIntervalSince1970 - TimeInterval(tv.tv_sec)
-    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -58,7 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
             self?.hide()
         }
-        if !launchedAtLogin { show() }
+        show()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
