@@ -110,6 +110,7 @@ final class LaunchModel: ObservableObject {
     @Published var mergeTarget: String?
     @Published var editMode = false
     @Published var pendingDelete: String?
+    @Published var deleteOpen = false
     @Published var visible = false
     @Published var launching: String?
     @Published var wallpaper: NSImage?
@@ -217,6 +218,7 @@ final class LaunchModel: ObservableObject {
         folderOpen = false
         editMode = false
         pendingDelete = nil
+        deleteOpen = false
         deleteError = nil
         launching = nil
         dragTimer?.invalidate()
@@ -321,12 +323,23 @@ final class LaunchModel: ObservableObject {
 
     func requestDelete(_ path: String) {
         deleteError = nil
+        deleteOpen = false
         pendingDelete = path
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) {
+            withAnimation(.spring(response: 0.38, dampingFraction: 0.78)) { self.deleteOpen = true }
+        }
     }
 
-    func cancelDelete() {
-        pendingDelete = nil
-        deleteError = nil
+    func cancelDelete(then after: (() -> Void)? = nil) {
+        guard let path = pendingDelete else { return }
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) { deleteOpen = false }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
+            if self.pendingDelete == path && !self.deleteOpen {
+                self.pendingDelete = nil
+                self.deleteError = nil
+            }
+            after?()
+        }
     }
 
     func confirmDelete() {
@@ -335,10 +348,11 @@ final class LaunchModel: ObservableObject {
             DispatchQueue.main.async {
                 guard let self else { return }
                 if let error {
-                    self.deleteError = "Не получилось: \(error.localizedDescription)"
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                        self.deleteError = "Не получилось: \(error.localizedDescription)"
+                    }
                 } else {
-                    self.pendingDelete = nil
-                    self.reload()
+                    self.cancelDelete { self.reload() }
                 }
             }
         }

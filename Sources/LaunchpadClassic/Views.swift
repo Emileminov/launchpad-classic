@@ -357,35 +357,98 @@ struct Jiggle: ViewModifier {
     }
 }
 
+struct DialogButtonStyle: ButtonStyle {
+    enum Kind { case cancel, destructive }
+    let kind: Kind
+    @State private var hover = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 14, weight: kind == .destructive ? .semibold : .medium))
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .frame(height: 40)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(kind == .destructive
+                          ? AnyShapeStyle(LinearGradient(colors: [Color(red: 1.0, green: 0.35, blue: 0.30), Color(red: 0.88, green: 0.19, blue: 0.20)], startPoint: .top, endPoint: .bottom))
+                          : AnyShapeStyle(Color.white.opacity(hover ? 0.2 : 0.13)))
+            )
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(.white.opacity(0.12), lineWidth: 0.5))
+            .brightness(kind == .destructive && hover ? 0.06 : 0)
+            .scaleEffect(configuration.isPressed ? 0.95 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .animation(.easeOut(duration: 0.15), value: hover)
+            .onHover { hover = $0 }
+    }
+}
+
 struct DeleteDialog: View {
     @ObservedObject var model: LaunchModel
     let path: String
     let name: String
 
     var body: some View {
+        let open = model.deleteOpen
         ZStack {
-            Color.black.opacity(0.45)
+            Color.black.opacity(open ? 0.5 : 0)
                 .contentShape(Rectangle())
                 .onTapGesture { model.cancelDelete() }
-            VStack(spacing: 14) {
-                Image(nsImage: IconCache.icon(path)).resizable().frame(width: 64, height: 64)
-                Text("Удалить «\(name)»?").font(.system(size: 17, weight: .semibold)).foregroundStyle(.white)
-                Text(model.deleteError ?? "Приложение будет перемещено в Корзину.")
-                    .font(.system(size: 13))
-                    .foregroundStyle(model.deleteError == nil ? .white.opacity(0.7) : Color.red)
+
+            VStack(spacing: 0) {
+                ZStack(alignment: .bottomTrailing) {
+                    Image(nsImage: IconCache.icon(path))
+                        .resizable()
+                        .frame(width: 84, height: 84)
+                        .shadow(color: .black.opacity(0.4), radius: 10, y: 6)
+                    Image(systemName: "trash.fill")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 30, height: 30)
+                        .background(Circle().fill(LinearGradient(colors: [Color(red: 1.0, green: 0.35, blue: 0.30), Color(red: 0.88, green: 0.19, blue: 0.20)], startPoint: .top, endPoint: .bottom)))
+                        .overlay(Circle().stroke(.white.opacity(0.35), lineWidth: 1))
+                        .offset(x: 8, y: 8)
+                        .scaleEffect(open ? 1 : 0.2)
+                        .animation(.spring(response: 0.4, dampingFraction: 0.55).delay(0.12), value: open)
+                }
+                .padding(.bottom, 18)
+
+                Text("Удалить «\(name)»?")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
                     .multilineTextAlignment(.center)
-                    .frame(width: 280)
-                HStack(spacing: 12) {
+                    .lineLimit(2)
+                    .padding(.bottom, 6)
+                Text(model.deleteError ?? "Приложение будет перемещено в Корзину.\nЕго можно будет вернуть оттуда.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(model.deleteError == nil ? Color.white.opacity(0.62) : Color(red: 1.0, green: 0.45, blue: 0.4))
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.bottom, 22)
+
+                HStack(spacing: 10) {
                     Button("Отмена") { model.cancelDelete() }
+                        .buttonStyle(DialogButtonStyle(kind: .cancel))
                         .keyboardShortcut(.cancelAction)
                     Button("Удалить") { model.confirmDelete() }
+                        .buttonStyle(DialogButtonStyle(kind: .destructive))
                         .keyboardShortcut(.defaultAction)
                 }
-                .controlSize(.large)
             }
-            .padding(28)
-            .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(.ultraThickMaterial))
-            .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(.white.opacity(0.15), lineWidth: 0.5))
+            .frame(width: 290)
+            .padding(.horizontal, 28)
+            .padding(.top, 30)
+            .padding(.bottom, 26)
+            .background(
+                ZStack {
+                    RoundedRectangle(cornerRadius: 32, style: .continuous).fill(.ultraThinMaterial)
+                    RoundedRectangle(cornerRadius: 32, style: .continuous).fill(Color.black.opacity(0.34))
+                }
+            )
+            .overlay(RoundedRectangle(cornerRadius: 32, style: .continuous).stroke(.white.opacity(0.14), lineWidth: 0.5))
+            .shadow(color: .black.opacity(0.4), radius: 34, y: 14)
+            .scaleEffect(open ? 1 : 0.86)
+            .opacity(open ? 1 : 0)
         }
     }
 }
