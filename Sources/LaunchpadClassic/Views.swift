@@ -77,7 +77,7 @@ struct RootView: View {
                     .clipped()
             }
             // графит: тёмно-серый с едва заметным намёком на обои
-            LinearGradient(colors: [Color(red: 0.20, green: 0.21, blue: 0.23), Color(red: 0.13, green: 0.14, blue: 0.15)],
+            LinearGradient(colors: [Color(red: 0.235, green: 0.245, blue: 0.265), Color(red: 0.145, green: 0.150, blue: 0.165)],
                            startPoint: .top, endPoint: .bottom)
                 .opacity(model.wallpaper == nil ? 1 : 0.88)
         }
