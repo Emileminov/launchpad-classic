@@ -88,7 +88,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
         isShown = true
         model.focusTick += 1
-        DispatchQueue.main.async { self.model.visible = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) { self.model.setVisible(true) }
     }
 
     func hide() {
@@ -96,8 +96,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         isShown = false
         model.editMode = false
         let gen = showGen
-        model.visible = false
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+        model.setVisible(false)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
             guard gen == self.showGen, !self.isShown else { return }
             self.window.orderOut(nil)
             NSApp.presentationOptions = []

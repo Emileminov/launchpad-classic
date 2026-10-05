@@ -233,9 +233,16 @@ final class LaunchModel: ObservableObject {
         }
     }
 
+    func setVisible(_ v: Bool) {
+        withAnimation(.easeInOut(duration: 0.32)) { visible = v }
+    }
+
     func launch(_ path: String) {
-        withAnimation(.easeOut(duration: 0.28)) { launching = path }
-        NSWorkspace.shared.openApplication(at: URL(fileURLWithPath: path), configuration: NSWorkspace.OpenConfiguration())
+        withAnimation(.easeOut(duration: 0.3)) { launching = path }
+        // даём анимации стартовать, затем открываем приложение и плавно закрываем Launchpad
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            NSWorkspace.shared.openApplication(at: URL(fileURLWithPath: path), configuration: NSWorkspace.OpenConfiguration())
+        }
         close()
     }
 

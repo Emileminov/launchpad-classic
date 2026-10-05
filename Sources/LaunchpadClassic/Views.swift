@@ -57,11 +57,10 @@ struct RootView: View {
                         .transition(.opacity.combined(with: .scale(scale: 0.92)))
                 }
                 }
-                .scaleEffect(model.visible ? 1 : 1.12)
+                .scaleEffect(model.visible ? 1 : (model.launching == nil ? 1.12 : 1.4))
                 .opacity(model.visible ? 1 : 0)
             }
             .animation(.easeOut(duration: 0.2), value: model.openFolderID)
-            .animation(.easeOut(duration: 0.28), value: model.visible)
             .onAppear { model.pageWidth = w; model.pageSize = cols * rows; searchFocused = true }
             .onChange(of: w) { _, v in model.pageWidth = v }
             .onChange(of: model.focusTick) { _, _ in searchFocused = true }
@@ -211,40 +210,42 @@ struct TileView: View {
     var body: some View {
         let isLaunching = model.launching == item.id
         VStack(spacing: 6) {
+            // кликабельна ТОЛЬКО сама иконка
             ItemIcon(item: item, size: metrics.icon)
                 .scaleEffect(model.mergeTarget == item.id ? 1.18 : 1)
                 .overlay(alignment: .topLeading) { deleteBadge }
+                .contentShape(RoundedRectangle(cornerRadius: metrics.icon * 0.22, style: .continuous))
+                .onTapGesture { model.activate(item) }
+                .simultaneousGesture(LongPressGesture(minimumDuration: 0.8).onEnded { _ in
+                    if model.draggingID == nil { model.editMode = true }
+                })
+                .onDrag {
+                    model.draggingID = item.id
+                    return NSItemProvider(object: item.id as NSString)
+                } preview: {
+                    ItemIcon(item: item, size: metrics.icon)
+                }
+                .contextMenu {
+                    switch item {
+                    case .app(let p):
+                        Button("Показать в Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: p)]) }
+                        if model.isDeletable(p) { Button("Удалить…") { model.requestDelete(p) } }
+                    case .folder(let f):
+                        Button("Разобрать папку") { model.dissolve(f.id) }
+                    }
+                }
             Text(model.title(item))
                 .font(.system(size: 13))
                 .foregroundStyle(.white)
                 .shadow(color: .black.opacity(0.55), radius: 2, y: 1)
                 .lineLimit(1)
                 .frame(maxWidth: metrics.cell.width - 12)
+                .allowsHitTesting(false)
         }
-        .scaleEffect(isLaunching ? 1.4 : 1)
+        .scaleEffect(isLaunching ? 1.6 : 1)
         .opacity(isLaunching ? 0 : (model.draggingID == item.id ? 0.35 : 1))
         .modifier(Jiggle(active: model.editMode, seed: Double(abs(item.id.hashValue) % 100)))
-        .contentShape(Rectangle())
-        .onTapGesture { model.activate(item) }
-        .simultaneousGesture(LongPressGesture(minimumDuration: 0.8).onEnded { _ in
-            if model.draggingID == nil { model.editMode = true }
-        })
-        .onDrag {
-            model.draggingID = item.id
-            return NSItemProvider(object: item.id as NSString)
-        } preview: {
-            ItemIcon(item: item, size: metrics.icon)
-        }
-        .contextMenu {
-            switch item {
-            case .app(let p):
-                Button("Показать в Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: p)]) }
-                if model.isDeletable(p) { Button("Удалить…") { model.requestDelete(p) } }
-            case .folder(let f):
-                Button("Разобрать папку") { model.dissolve(f.id) }
-            }
-        }
-        // ячейка целиком нужна только для перетаскивания; клик по пустому месту закрывает Launchpad
+        // ячейка целиком нужна только для перетаскивания; клик мимо иконки закрывает Launchpad
         .frame(width: metrics.cell.width, height: metrics.cell.height)
         .contentShape(Rectangle())
         .onTapGesture { model.backgroundTap() }
