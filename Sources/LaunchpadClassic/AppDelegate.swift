@@ -58,11 +58,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         effect.blendingMode = .behindWindow
         effect.state = .active
         effectView = effect
+        effect.autoresizingMask = [.width, .height]
         let host = NSHostingView(rootView: RootView(model: model))
-        host.frame = effect.bounds
         host.autoresizingMask = [.width, .height]
-        effect.addSubview(host)
-        w.contentView = effect
+        let container = NSView()
+        effect.frame = container.bounds
+        host.frame = container.bounds
+        container.addSubview(effect)
+        container.addSubview(host)
+        w.contentView = container
         window = w
     }
 
