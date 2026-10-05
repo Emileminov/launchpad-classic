@@ -145,15 +145,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: Menu
 
     private func buildMenu() {
-        let main = NSMenu()
-        let appItem = NSMenuItem()
-        main.addItem(appItem)
-        let menu = NSMenu()
-        menu.addItem(withTitle: "Показать Launchpad", action: #selector(toggle), keyEquivalent: "").target = self
-        menu.addItem(.separator())
-        menu.addItem(withTitle: "Выйти", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-        appItem.submenu = menu
-        NSApp.mainMenu = main
+        // меню приложения не нужно: Launchpad управляется значком в Dock и ⌃⌥Space, выход — ⌘Q
+        NSApp.mainMenu = NSMenu()
     }
 
     // MARK: Hot key  (⌃⌥Space)
@@ -196,6 +189,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func handleKey(_ e: NSEvent) -> NSEvent? {
+        if e.modifierFlags.contains(.command), e.charactersIgnoringModifiers == "q" { NSApp.terminate(nil); return nil }
         switch Int(e.keyCode) {
         case kVK_Escape:
             if model.pendingDelete != nil { model.cancelDelete() }
