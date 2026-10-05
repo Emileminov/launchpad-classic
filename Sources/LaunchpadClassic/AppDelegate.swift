@@ -15,6 +15,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var window: LaunchWindow!
     private var isShown = false
     private var optionEdit = false
+    private var effectView: NSVisualEffectView!
+    private var showGen = 0
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -54,6 +56,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         effect.material = .hudWindow
         effect.blendingMode = .behindWindow
         effect.state = .active
+        effectView = effect
         let host = NSHostingView(rootView: RootView(model: model))
         host.frame = effect.bounds
         host.autoresizingMask = [.width, .height]
@@ -69,29 +72,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.resetForShow()
         model.reload()
         NSApp.presentationOptions = [.hideDock, .hideMenuBar]
-        window.alphaValue = 0
+        showGen += 1
+        let wp = NSWorkspace.shared.desktopImageURL(for: screen).flatMap { NSImage(contentsOf: $0) }
+        model.wallpaper = wp
+        effectView.isHidden = wp != nil
+        model.visible = false
+        window.alphaValue = 1
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         isShown = true
         model.focusTick += 1
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.2
-            window.animator().alphaValue = 1
-        }
+        DispatchQueue.main.async { self.model.visible = true }
     }
 
     func hide() {
         guard isShown else { return }
         isShown = false
         model.editMode = false
-        NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = 0.15
-            window.animator().alphaValue = 0
-        }, completionHandler: {
+        let gen = showGen
+        model.visible = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            guard gen == self.showGen, !self.isShown else { return }
             self.window.orderOut(nil)
             NSApp.presentationOptions = []
             NSApp.hide(nil)
-        })
+        }
     }
 
     @objc func toggle() { isShown ? hide() : show() }

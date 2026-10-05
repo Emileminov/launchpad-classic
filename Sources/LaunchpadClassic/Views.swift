@@ -23,10 +23,12 @@ struct RootView: View {
             let metrics = GridMetrics(cell: cell, icon: min(cell.width * 0.62, cell.height - 40, 150))
 
             ZStack {
-                Color.black.opacity(0.3)
+                background(size: geo.size)
+                    .opacity(model.visible ? 1 : 0)
                     .contentShape(Rectangle())
-                    .onTapGesture { backgroundTap() }
+                    .onTapGesture { model.backgroundTap() }
 
+                Group {
                 VStack(spacing: 0) {
                     searchBar.padding(.top, 40).padding(.bottom, 24)
                     pager(w: w, gridH: gridH, metrics: metrics)
@@ -54,8 +56,12 @@ struct RootView: View {
                         .allowsHitTesting(!model.folderHidden)
                         .transition(.opacity.combined(with: .scale(scale: 0.92)))
                 }
+                }
+                .scaleEffect(model.visible ? 1 : 1.12)
+                .opacity(model.visible ? 1 : 0)
             }
             .animation(.easeOut(duration: 0.2), value: model.openFolderID)
+            .animation(.easeOut(duration: 0.28), value: model.visible)
             .onAppear { model.pageWidth = w; model.pageSize = cols * rows; searchFocused = true }
             .onChange(of: w) { _, v in model.pageWidth = v }
             .onChange(of: model.focusTick) { _, _ in searchFocused = true }
@@ -65,10 +71,21 @@ struct RootView: View {
         .preferredColorScheme(.dark)
     }
 
-    private func backgroundTap() {
-        if model.openFolderID != nil { model.openFolderID = nil }
-        else if model.editMode { model.editMode = false }
-        else { model.close() }
+    private func background(size: CGSize) -> some View {
+        ZStack {
+            if let img = model.wallpaper {
+                Image(nsImage: img)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size.width, height: size.height)
+                    .clipped()
+                    .scaleEffect(1.05)
+                    .blur(radius: 16)
+                    .frame(width: size.width, height: size.height)
+                    .clipped()
+            }
+            Color.black.opacity(model.wallpaper == nil ? 0.3 : 0.2)
+        }
     }
 
     private var searchBar: some View {
@@ -112,6 +129,7 @@ struct RootView: View {
         return OffsetContainer(pager: model.pager, page: model.page, width: w, content: content)
             .frame(width: w, height: gridH, alignment: .leading)
             .contentShape(Rectangle())
+            .onTapGesture { model.backgroundTap() }
             .onDrop(of: [.plainText], delegate: PageDrop(model: model))
     }
 
@@ -191,6 +209,7 @@ struct TileView: View {
     var containerFolder: String? = nil
 
     var body: some View {
+        let isLaunching = model.launching == item.id
         VStack(spacing: 6) {
             ItemIcon(item: item, size: metrics.icon)
                 .scaleEffect(model.mergeTarget == item.id ? 1.18 : 1)
@@ -200,11 +219,11 @@ struct TileView: View {
                 .foregroundStyle(.white)
                 .shadow(color: .black.opacity(0.55), radius: 2, y: 1)
                 .lineLimit(1)
-                .frame(width: metrics.cell.width - 12)
+                .frame(maxWidth: metrics.cell.width - 12)
         }
+        .scaleEffect(isLaunching ? 1.4 : 1)
+        .opacity(isLaunching ? 0 : (model.draggingID == item.id ? 0.35 : 1))
         .modifier(Jiggle(active: model.editMode, seed: Double(abs(item.id.hashValue) % 100)))
-        .frame(width: metrics.cell.width, height: metrics.cell.height)
-        .opacity(model.draggingID == item.id ? 0.35 : 1)
         .contentShape(Rectangle())
         .onTapGesture { model.activate(item) }
         .simultaneousGesture(LongPressGesture(minimumDuration: 0.8).onEnded { _ in
@@ -216,8 +235,6 @@ struct TileView: View {
         } preview: {
             ItemIcon(item: item, size: metrics.icon)
         }
-        .onDrop(of: [.plainText], delegate: TileDrop(model: model, target: item.id, metrics: metrics, folder: containerFolder))
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: model.mergeTarget)
         .contextMenu {
             switch item {
             case .app(let p):
@@ -227,6 +244,12 @@ struct TileView: View {
                 Button("Разобрать папку") { model.dissolve(f.id) }
             }
         }
+        // ячейка целиком нужна только для перетаскивания; клик по пустому месту закрывает Launchpad
+        .frame(width: metrics.cell.width, height: metrics.cell.height)
+        .contentShape(Rectangle())
+        .onTapGesture { model.backgroundTap() }
+        .onDrop(of: [.plainText], delegate: TileDrop(model: model, target: item.id, metrics: metrics, folder: containerFolder))
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: model.mergeTarget)
     }
 
     @ViewBuilder private var deleteBadge: some View {

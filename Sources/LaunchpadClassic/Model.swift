@@ -81,6 +81,9 @@ final class LaunchModel: ObservableObject {
     @Published var mergeTarget: String?
     @Published var editMode = false
     @Published var pendingDelete: String?
+    @Published var visible = false
+    @Published var launching: String?
+    @Published var wallpaper: NSImage?
     @Published var deleteError: String?
     @Published var focusTick = 0
     @Published var draggingID: String? {
@@ -175,6 +178,7 @@ final class LaunchModel: ObservableObject {
         editMode = false
         pendingDelete = nil
         deleteError = nil
+        launching = nil
         draggingID = nil
     }
 
@@ -230,8 +234,16 @@ final class LaunchModel: ObservableObject {
     }
 
     func launch(_ path: String) {
+        withAnimation(.easeOut(duration: 0.28)) { launching = path }
         NSWorkspace.shared.openApplication(at: URL(fileURLWithPath: path), configuration: NSWorkspace.OpenConfiguration())
         close()
+    }
+
+    func backgroundTap() {
+        if pendingDelete != nil { cancelDelete() }
+        else if openFolderID != nil { openFolderID = nil }
+        else if editMode { editMode = false }
+        else { close() }
     }
 
     func launchFirstResult() {

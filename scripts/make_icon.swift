@@ -1,55 +1,52 @@
 import AppKit
 
-// Рисует значок: серебристая плитка с ракетой, как у старого Launchpad.
+// Значок как у Launchpad в macOS Big Sur … Sequoia: светлая плитка и сетка 3×3 цветных квадратов.
 let S: CGFloat = 1024
 let img = NSImage(size: NSSize(width: S, height: S))
 img.lockFocus()
 let ctx = NSGraphicsContext.current!.cgContext
 let tile = CGRect(x: 100, y: 100, width: 824, height: 824)
 let path = NSBezierPath(roundedRect: tile, xRadius: 185, yRadius: 185)
+
 ctx.saveGState()
-ctx.setShadow(offset: CGSize(width: 0, height: -14), blur: 28, color: NSColor.black.withAlphaComponent(0.35).cgColor)
+ctx.setShadow(offset: CGSize(width: 0, height: -14), blur: 28, color: NSColor.black.withAlphaComponent(0.3).cgColor)
 NSColor.white.setFill(); path.fill()
 ctx.restoreGState()
+
+ctx.saveGState()
 path.addClip()
-let grad = NSGradient(colors: [NSColor(white: 0.97, alpha: 1), NSColor(white: 0.62, alpha: 1)])!
-grad.draw(in: tile, angle: -90)
+NSGradient(colors: [NSColor(white: 1.0, alpha: 1), NSColor(white: 0.84, alpha: 1)])!.draw(in: tile, angle: -90)
+ctx.restoreGState()
+NSColor(white: 1, alpha: 0.7).setStroke(); path.lineWidth = 3; path.stroke()
 
-// ракета (рисуем вертикально, затем поворачиваем на 45°)
-ctx.translateBy(x: S/2, y: S/2)
-ctx.rotate(by: .pi / 4)
-let body = NSBezierPath()
-body.move(to: CGPoint(x: 0, y: 300))
-body.curve(to: CGPoint(x: 95, y: 40), controlPoint1: CGPoint(x: 80, y: 220), controlPoint2: CGPoint(x: 95, y: 130))
-body.line(to: CGPoint(x: 95, y: -150))
-body.line(to: CGPoint(x: -95, y: -150))
-body.line(to: CGPoint(x: -95, y: 40))
-body.curve(to: CGPoint(x: 0, y: 300), controlPoint1: CGPoint(x: -95, y: 130), controlPoint2: CGPoint(x: -80, y: 220))
-body.close()
-NSGradient(colors: [NSColor(white: 1, alpha: 1), NSColor(white: 0.78, alpha: 1)])!.draw(in: body, angle: 0)
-NSColor(white: 0.45, alpha: 1).setStroke(); body.lineWidth = 5; body.stroke()
-
-func fin(_ sign: CGFloat) {
-    let f = NSBezierPath()
-    f.move(to: CGPoint(x: sign * 95, y: 20))
-    f.line(to: CGPoint(x: sign * 190, y: -150))
-    f.line(to: CGPoint(x: sign * 95, y: -110))
-    f.close()
-    NSColor(red: 0.92, green: 0.22, blue: 0.2, alpha: 1).setFill(); f.fill()
+func rgb(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat) -> NSColor { NSColor(red: r/255, green: g/255, blue: b/255, alpha: 1) }
+// (верх, низ) для каждой ячейки, слева направо, сверху вниз
+let colors: [(NSColor, NSColor)] = [
+    (rgb(120, 230, 100), rgb(40, 190, 60)),   // зелёный
+    (rgb(255, 215, 80),  rgb(250, 175, 20)),  // жёлтый
+    (rgb(255, 170, 60),  rgb(245, 120, 20)),  // оранжевый
+    (rgb(255, 100, 90),  rgb(225, 40, 45)),   // красный
+    (rgb(205, 210, 215), rgb(150, 155, 162)), // серый
+    (rgb(255, 110, 150), rgb(235, 50, 100)),  // розовый
+    (rgb(190, 110, 235), rgb(135, 60, 200)),  // фиолетовый
+    (rgb(80, 175, 255),  rgb(20, 110, 235)),  // синий
+    (rgb(100, 225, 190), rgb(40, 190, 150)),  // бирюзовый
+]
+let cell: CGFloat = 170, gap: CGFloat = 40
+let total = cell * 3 + gap * 2
+let x0 = S/2 - total/2, yTop = S/2 + total/2
+for i in 0..<9 {
+    let r = i / 3, c = i % 3
+    let rect = CGRect(x: x0 + CGFloat(c) * (cell + gap), y: yTop - CGFloat(r + 1) * cell - CGFloat(r) * gap, width: cell, height: cell)
+    let p = NSBezierPath(roundedRect: rect, xRadius: 42, yRadius: 42)
+    ctx.saveGState()
+    ctx.setShadow(offset: CGSize(width: 0, height: -5), blur: 9, color: NSColor.black.withAlphaComponent(0.22).cgColor)
+    colors[i].1.setFill(); p.fill()
+    ctx.restoreGState()
+    ctx.saveGState(); p.addClip()
+    NSGradient(colors: [colors[i].0, colors[i].1])!.draw(in: rect, angle: -90)
+    ctx.restoreGState()
 }
-fin(1); fin(-1)
-let nose = NSBezierPath()
-nose.move(to: CGPoint(x: 0, y: 300))
-nose.curve(to: CGPoint(x: 70, y: 160), controlPoint1: CGPoint(x: 45, y: 255), controlPoint2: CGPoint(x: 62, y: 205))
-nose.line(to: CGPoint(x: -70, y: 160))
-nose.curve(to: CGPoint(x: 0, y: 300), controlPoint1: CGPoint(x: -62, y: 205), controlPoint2: CGPoint(x: -45, y: 255))
-NSColor(red: 0.92, green: 0.22, blue: 0.2, alpha: 1).setFill(); nose.fill()
-let win = NSBezierPath(ovalIn: CGRect(x: -48, y: 60, width: 96, height: 96))
-NSColor(red: 0.2, green: 0.45, blue: 0.85, alpha: 1).setFill(); win.fill()
-NSColor(white: 0.4, alpha: 1).setStroke(); win.lineWidth = 8; win.stroke()
-let flame = NSBezierPath()
-flame.move(to: CGPoint(x: -60, y: -150)); flame.line(to: CGPoint(x: 0, y: -290)); flame.line(to: CGPoint(x: 60, y: -150)); flame.close()
-NSGradient(colors: [NSColor.yellow, NSColor.orange])!.draw(in: flame, angle: -90)
 img.unlockFocus()
 
 let rep = NSBitmapImageRep(data: img.tiffRepresentation!)!
