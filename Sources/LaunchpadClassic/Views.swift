@@ -324,6 +324,9 @@ struct FolderOverlay: View {
                 })
             }
             .padding(40)
+            // содержимое проявляется чуть позже стекла, при закрытии уходит вместе с ним
+            .opacity(open ? 1 : 0)
+            .animation(open ? .easeOut(duration: 0.26).delay(0.12) : .easeIn(duration: 0.2).delay(0.06), value: open)
             .background(
                 ZStack {
                     RoundedRectangle(cornerRadius: 44, style: .continuous).fill(.ultraThinMaterial)
@@ -332,11 +335,12 @@ struct FolderOverlay: View {
             )
             .overlay(RoundedRectangle(cornerRadius: 44, style: .continuous).stroke(.white.opacity(0.14), lineWidth: 0.5))
             .shadow(color: .black.opacity(0.35), radius: 30, y: 12)
+            .opacity(open ? 1 : 0)
+            .animation(open ? .easeOut(duration: 0.12) : .spring(response: 0.36, dampingFraction: 0.92), value: open)
             // панель вырастает из иконки папки
             .scaleEffect(s)
             .offset(x: (model.folderAnchor.x - screen.width / 2) * (1 - s),
                     y: (model.folderAnchor.y - screen.height / 2) * (1 - s))
-            .opacity(open ? 1 : 0)
         }
     }
 }

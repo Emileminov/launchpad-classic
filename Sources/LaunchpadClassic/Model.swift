@@ -285,8 +285,9 @@ final class LaunchModel: ObservableObject {
         }
         folderOpen = false
         openFolderID = id
-        DispatchQueue.main.async {
-            withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) { self.folderOpen = true }
+        // даём панели один кадр на раскладку, чтобы анимация не начиналась с подвисания
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.86)) { self.folderOpen = true }
         }
     }
 
