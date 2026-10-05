@@ -53,6 +53,9 @@ struct RootView: View {
                 FloatingIcon(drag: model.drag, item: model.draggingItem, size: metrics.icon)
             }
             .coordinateSpace(name: "root")
+            .simultaneousGesture(DragGesture(minimumDistance: 8)
+                .onChanged { model.pageDragChanged($0.translation.width) }
+                .onEnded { model.pageDragEnded($0.translation.width, predicted: $0.predictedEndTranslation.width) })
             .onAppear { model.pageWidth = w; model.pageSize = cols * rows; searchFocused = true }
             .onChange(of: w) { _, v in model.pageWidth = v }
             .onChange(of: model.focusTick) { _, _ in searchFocused = true }

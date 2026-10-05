@@ -464,6 +464,27 @@ final class LaunchModel: ObservableObject {
         if t != page { withAnimation(Self.spring) { page = t } }
     }
 
+    private var pageDragging = false
+
+    /// Листание перетаскиванием мыши по пустому месту.
+    func pageDragChanged(_ dx: CGFloat) {
+        guard openFolderID == nil, pendingDelete == nil, draggingID == nil, pageCount > 1 else { return }
+        pageDragging = true
+        var off = dx
+        if (page == 0 && dx > 0) || (page == pageCount - 1 && dx < 0) { off = dx * 0.25 }
+        pager.dragOffset = off
+    }
+
+    func pageDragEnded(_ dx: CGFloat, predicted: CGFloat) {
+        guard pageDragging else { return }
+        pageDragging = false
+        withAnimation(Self.spring) {
+            if dx < -pageWidth * 0.15 || predicted < -pageWidth * 0.4 { changePage(1) }
+            else if dx > pageWidth * 0.15 || predicted > pageWidth * 0.4 { changePage(-1) }
+            pager.dragOffset = 0
+        }
+    }
+
     /// Returns true if the event was consumed.
     func handleScroll(_ e: NSEvent) -> Bool {
         guard openFolderID == nil, draggingID == nil, pageCount > 1 else { return false }
