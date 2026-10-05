@@ -56,7 +56,51 @@ enum AppScanner {
     }
 }
 
+struct IconHit: Shape {
+    /// видимые границы иконки в долях её рамки (y вниз)
+    let unit: CGRect
+
+    func path(in rect: CGRect) -> Path {
+        let r = CGRect(x: rect.minX + unit.minX * rect.width, y: rect.minY + unit.minY * rect.height,
+                       width: unit.width * rect.width, height: unit.height * rect.height)
+        return Path(roundedRect: r, cornerRadius: min(r.width, r.height) * 0.225, style: .continuous)
+    }
+}
+
 enum IconCache {
+    private static var boundsCache: [String: CGRect] = [:]
+
+    /// Рамка видимой (непрозрачной) части иконки в долях 0…1 — у иконок macOS есть прозрачные поля.
+    static func bounds(_ path: String) -> CGRect {
+        if let b = boundsCache[path] { return b }
+        let full = CGRect(x: 0, y: 0, width: 1, height: 1)
+        let n = 128
+        var result = full
+        if let ctx = CGContext(data: nil, width: n, height: n, bitsPerComponent: 8, bytesPerRow: n * 4,
+                               space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) {
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: false)
+            icon(path).draw(in: NSRect(x: 0, y: 0, width: n, height: n))
+            NSGraphicsContext.restoreGraphicsState()
+            if let data = ctx.data {
+                let px = data.bindMemory(to: UInt8.self, capacity: n * n * 4)
+                var minX = n, minY = n, maxX = -1, maxY = -1
+                for y in 0..<n {
+                    for x in 0..<n where px[(y * n + x) * 4 + 3] > 128 {
+                        minX = min(minX, x); maxX = max(maxX, x)
+                        minY = min(minY, y); maxY = max(maxY, y)
+                    }
+                }
+                if maxX > minX && maxY > minY {
+                    result = CGRect(x: CGFloat(minX) / CGFloat(n), y: CGFloat(minY) / CGFloat(n),
+                                    width: CGFloat(maxX - minX + 1) / CGFloat(n), height: CGFloat(maxY - minY + 1) / CGFloat(n))
+                }
+            }
+        }
+        boundsCache[path] = result
+        return result
+    }
+
     private static let cache = NSCache<NSString, NSImage>()
     static func icon(_ path: String) -> NSImage {
         if let i = cache.object(forKey: path as NSString) { return i }

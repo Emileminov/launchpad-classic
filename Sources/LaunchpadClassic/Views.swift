@@ -39,13 +39,13 @@ struct RootView: View {
                 .blur(radius: model.folderOpen ? 7 : 0)
                 .scaleEffect(model.folderOpen ? 0.96 : 1)
 
+                if let f = model.openFolder {
+                    FolderOverlay(model: model, folder: f, screen: geo.size)
+                }
+
                 if let p = model.pendingDelete, let info = model.catalog[p] {
                     DeleteDialog(model: model, path: p, name: info.name)
                         .transition(.opacity)
-                }
-
-                if let f = model.openFolder {
-                    FolderOverlay(model: model, folder: f, screen: geo.size)
                 }
                 }
                 .scaleEffect(model.visible ? 1 : (model.launching == nil ? 1.12 : 1.4))
@@ -219,12 +219,16 @@ struct TileView: View {
 
     var body: some View {
         let isLaunching = model.launching == item.id
+        let vis: CGRect = {
+            if case .app(let p) = item { return IconCache.bounds(p) }
+            return CGRect(x: 0, y: 0, width: 1, height: 1)
+        }()
         VStack(spacing: 6) {
             // кликабельна ТОЛЬКО сама иконка
             ItemIcon(item: item, size: metrics.icon)
                 .scaleEffect(model.mergeTarget == item.id ? 1.18 : (pressed ? 0.9 : 1))
                 .animation(.easeOut(duration: 0.12), value: pressed)
-                .contentShape(RoundedRectangle(cornerRadius: metrics.icon * 0.22, style: .continuous))
+                .contentShape(IconHit(unit: vis))
                 .onTapGesture { model.activate(item) }
                 .simultaneousGesture(DragGesture(minimumDistance: 0).updating($pressed) { _, s, _ in s = true })
                 .simultaneousGesture(LongPressGesture(minimumDuration: 0.8).onEnded { _ in
@@ -243,7 +247,7 @@ struct TileView: View {
                     }
                 }
                 // крестик — отдельный слой поверх иконки, со своей зоной нажатия
-                .overlay(alignment: .topLeading) { deleteBadge }
+                .overlay(alignment: .topLeading) { deleteBadge(vis) }
             Text(model.title(item))
                 .font(.system(size: 13))
                 .foregroundStyle(.white)
@@ -262,7 +266,7 @@ struct TileView: View {
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: model.mergeTarget)
     }
 
-    @ViewBuilder private var deleteBadge: some View {
+    @ViewBuilder private func deleteBadge(_ vis: CGRect) -> some View {
         if model.editMode, case .app(let p) = item, model.isDeletable(p) {
             Button { model.requestDelete(p) } label: {
                 Image(systemName: "xmark")
@@ -274,7 +278,7 @@ struct TileView: View {
                     .contentShape(Circle())
             }
             .buttonStyle(.plain)
-            .offset(x: -8, y: -8)
+            .offset(x: vis.minX * metrics.icon - 8, y: vis.minY * metrics.icon - 8)
         }
     }
 }
