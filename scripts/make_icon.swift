@@ -15,9 +15,9 @@ ctx.restoreGState()
 
 ctx.saveGState()
 path.addClip()
-NSGradient(colors: [NSColor(white: 1.0, alpha: 1), NSColor(white: 0.84, alpha: 1)])!.draw(in: tile, angle: -90)
+NSGradient(colors: [NSColor(red: 0.30, green: 0.31, blue: 0.34, alpha: 1), NSColor(red: 0.15, green: 0.16, blue: 0.18, alpha: 1)])!.draw(in: tile, angle: -90)
 ctx.restoreGState()
-NSColor(white: 1, alpha: 0.7).setStroke(); path.lineWidth = 3; path.stroke()
+NSColor(white: 1, alpha: 0.18).setStroke(); path.lineWidth = 3; path.stroke()
 
 func rgb(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat) -> NSColor { NSColor(red: r/255, green: g/255, blue: b/255, alpha: 1) }
 // (верх, низ) для каждой ячейки, слева направо, сверху вниз
@@ -26,7 +26,7 @@ let colors: [(NSColor, NSColor)] = [
     (rgb(255, 215, 80),  rgb(250, 175, 20)),  // жёлтый
     (rgb(255, 170, 60),  rgb(245, 120, 20)),  // оранжевый
     (rgb(255, 100, 90),  rgb(225, 40, 45)),   // красный
-    (rgb(205, 210, 215), rgb(150, 155, 162)), // серый
+    (rgb(215, 220, 225), rgb(160, 165, 172)), // серый
     (rgb(255, 110, 150), rgb(235, 50, 100)),  // розовый
     (rgb(190, 110, 235), rgb(135, 60, 200)),  // фиолетовый
     (rgb(80, 175, 255),  rgb(20, 110, 235)),  // синий
@@ -40,7 +40,7 @@ for i in 0..<9 {
     let rect = CGRect(x: x0 + CGFloat(c) * (cell + gap), y: yTop - CGFloat(r + 1) * cell - CGFloat(r) * gap, width: cell, height: cell)
     let p = NSBezierPath(roundedRect: rect, xRadius: 34, yRadius: 34)
     ctx.saveGState()
-    ctx.setShadow(offset: CGSize(width: 0, height: -5), blur: 9, color: NSColor.black.withAlphaComponent(0.22).cgColor)
+    ctx.setShadow(offset: CGSize(width: 0, height: -5), blur: 9, color: NSColor.black.withAlphaComponent(0.45).cgColor)
     colors[i].1.setFill(); p.fill()
     ctx.restoreGState()
     ctx.saveGState(); p.addClip()

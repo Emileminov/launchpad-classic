@@ -83,8 +83,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.reload()
         showGen += 1
         NSApp.unhide(nil)
-        model.wallpaper = nil
-        effectView.isHidden = true
+        let wp = NSWorkspace.shared.desktopImageURL(for: screen).flatMap { NSImage(contentsOf: $0) }
+        model.wallpaper = wp
+        effectView.isHidden = wp != nil
         model.visible = false
         window.alphaValue = 1
         window.makeKeyAndOrderFront(nil)
