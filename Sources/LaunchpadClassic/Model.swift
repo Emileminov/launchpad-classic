@@ -156,6 +156,7 @@ final class LaunchModel: ObservableObject {
     @Published var editMode = false
     @Published var pendingDelete: String?
     @Published var deleteOpen = false
+    @Published var deleteNeedsPermission = false
     @Published var visible = false
     @Published var launching: String?
     @Published var wallpaper: NSImage?
@@ -369,6 +370,7 @@ final class LaunchModel: ObservableObject {
 
     func requestDelete(_ path: String) {
         deleteError = nil
+        deleteNeedsPermission = false
         deleteOpen = false
         pendingDelete = path
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) {
@@ -383,6 +385,7 @@ final class LaunchModel: ObservableObject {
             if self.pendingDelete == path && !self.deleteOpen {
                 self.pendingDelete = nil
                 self.deleteError = nil
+                self.deleteNeedsPermission = false
             }
             after?()
         }
@@ -395,12 +398,24 @@ final class LaunchModel: ObservableObject {
                 guard let self else { return }
                 if let error {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                        self.deleteError = "Не получилось: \(error.localizedDescription)"
+                        // почти всегда это нехватка прав: macOS не даёт менять чужие приложения без «Управления приложениями»
+                        self.deleteNeedsPermission = true
+                        self.deleteError = "Не хватает прав на удаление. Разрешите Launchpad Classic управлять приложениями в настройках и повторите."
+                        _ = error
                     }
                 } else {
                     self.cancelDelete { self.reload() }
                 }
             }
+        }
+    }
+
+    /// Открывает Системные настройки → Конфиденциальность и безопасность → Управление приложениями.
+    func openAppManagementSettings() {
+        cancelDelete()
+        close()
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AppBundles") {
+            NSWorkspace.shared.open(url)
         }
     }
 

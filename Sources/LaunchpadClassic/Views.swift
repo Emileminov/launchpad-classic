@@ -373,24 +373,29 @@ struct Jiggle: ViewModifier {
 }
 
 struct DialogButtonStyle: ButtonStyle {
-    enum Kind { case cancel, destructive }
+    enum Kind { case cancel, destructive, accent }
     let kind: Kind
     @State private var hover = false
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 14, weight: kind == .destructive ? .semibold : .medium))
+            .font(.system(size: 14, weight: kind == .cancel ? .medium : .semibold))
             .foregroundStyle(.white)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .padding(.horizontal, 6)
             .frame(maxWidth: .infinity)
             .frame(height: 40)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(kind == .destructive
                           ? AnyShapeStyle(LinearGradient(colors: [Color(red: 1.0, green: 0.35, blue: 0.30), Color(red: 0.88, green: 0.19, blue: 0.20)], startPoint: .top, endPoint: .bottom))
+                          : kind == .accent
+                          ? AnyShapeStyle(LinearGradient(colors: [Color(red: 0.30, green: 0.58, blue: 1.0), Color(red: 0.12, green: 0.42, blue: 0.95)], startPoint: .top, endPoint: .bottom))
                           : AnyShapeStyle(Color.white.opacity(hover ? 0.2 : 0.13)))
             )
             .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(.white.opacity(0.12), lineWidth: 0.5))
-            .brightness(kind == .destructive && hover ? 0.06 : 0)
+            .brightness(kind != .cancel && hover ? 0.06 : 0)
             .scaleEffect(configuration.isPressed ? 0.95 : 1)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
             .animation(.easeOut(duration: 0.15), value: hover)
@@ -428,7 +433,7 @@ struct DeleteDialog: View {
                 }
                 .padding(.bottom, 18)
 
-                Text("Удалить «\(name)»?")
+                Text(model.deleteNeedsPermission ? "Нужно разрешение" : "Удалить «\(name)»?")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(.white)
                     .multilineTextAlignment(.center)
@@ -445,9 +450,15 @@ struct DeleteDialog: View {
                     Button("Отмена") { model.cancelDelete() }
                         .buttonStyle(DialogButtonStyle(kind: .cancel))
                         .keyboardShortcut(.cancelAction)
-                    Button("Удалить") { model.confirmDelete() }
-                        .buttonStyle(DialogButtonStyle(kind: .destructive))
-                        .keyboardShortcut(.defaultAction)
+                    if model.deleteNeedsPermission {
+                        Button("Открыть настройки") { model.openAppManagementSettings() }
+                            .buttonStyle(DialogButtonStyle(kind: .accent))
+                            .keyboardShortcut(.defaultAction)
+                    } else {
+                        Button("Удалить") { model.confirmDelete() }
+                            .buttonStyle(DialogButtonStyle(kind: .destructive))
+                            .keyboardShortcut(.defaultAction)
+                    }
                 }
             }
             .frame(width: 290)
