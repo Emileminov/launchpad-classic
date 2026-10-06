@@ -33,15 +33,16 @@ cat > "$OUT/Contents/Info.plist" <<PLIST
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSPrincipalClass</key><string>NSApplication</string>
+  <key>NSAppleEventsUsageDescription</key><string>Нужно, чтобы переместить приложение в Корзину через Finder, когда у Launchpad Classic недостаточно прав.</string>
   <key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
 </dict></plist>
 PLIST
 
 if [ -n "$SIGN_ID" ]; then
   # Developer ID + hardened runtime + timestamp — нужно для нотаризации
-  codesign --force --options runtime --timestamp --sign "$SIGN_ID" "$OUT"
+  codesign --force --options runtime --timestamp --entitlements LaunchpadClassic.entitlements --sign "$SIGN_ID" "$OUT"
 else
-  codesign --force --deep -s - "$OUT"
+  codesign --force --deep -s - --entitlements LaunchpadClassic.entitlements "$OUT"
 fi
 mkdir -p "$HOME/Applications"
 pkill -x LaunchpadClassic 2>/dev/null || true

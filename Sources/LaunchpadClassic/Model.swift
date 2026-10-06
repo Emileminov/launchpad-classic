@@ -157,6 +157,7 @@ final class LaunchModel: ObservableObject {
     @Published var pendingDelete: String?
     @Published var deleteOpen = false
     @Published var deleteNeedsPermission = false
+    var deleteSettingsURL = "x-apple.systempreferences:com.apple.preference.security?Privacy_AppBundles"
     @Published var visible = false
     @Published var launching: String?
     @Published var wallpaper: NSImage?
@@ -425,14 +426,38 @@ final class LaunchModel: ObservableObject {
             DispatchQueue.main.async {
                 guard let self else { return }
                 if let error {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                        // почти всегда это нехватка прав: macOS не даёт менять чужие приложения без «Управления приложениями»
-                        self.deleteNeedsPermission = true
-                        self.deleteError = "Не хватает прав на удаление. Разрешите Launchpad Classic управлять приложениями в настройках и повторите."
-                        _ = error
-                    }
+                    // обычный способ не вышел — просим Finder (он сам запросит пароль администратора)
+                    self.deleteViaFinder(path, recycleError: error)
                 } else {
                     self.cancelDelete { self.reload() }
+                }
+            }
+        }
+    }
+
+    func deleteViaFinder(_ path: String, recycleError: Error) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let escaped = path.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+            var err: NSDictionary?
+            NSAppleScript(source: "tell application \"Finder\" to delete (POSIX file \"\(escaped)\" as alias)")?.executeAndReturnError(&err)
+            let code = err?["NSAppleScriptErrorNumber"] as? Int ?? 0
+            let text = (err?["NSAppleScriptErrorMessage"] as? String) ?? recycleError.localizedDescription
+            DispatchQueue.main.async {
+                if err == nil {
+                    self.cancelDelete { self.reload() }
+                } else if code == -128 {
+                    self.cancelDelete()          // пользователь отменил ввод пароля
+                } else {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                        self.deleteNeedsPermission = true
+                        if code == -1743 {
+                            self.deleteSettingsURL = "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation"
+                            self.deleteError = "Разрешите Launchpad Classic управлять Finder (раздел «Автоматизация») и повторите. После выдачи разрешения перезапустите приложение."
+                        } else {
+                            self.deleteSettingsURL = "x-apple.systempreferences:com.apple.preference.security?Privacy_AppBundles"
+                            self.deleteError = "Не удалось удалить: \(text)\nЕсли дело в правах — включите Launchpad Classic в «Управлении приложениями» и перезапустите приложение."
+                        }
+                    }
                 }
             }
         }
@@ -442,7 +467,7 @@ final class LaunchModel: ObservableObject {
     func openAppManagementSettings() {
         cancelDelete()
         close()
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AppBundles") {
+        if let url = URL(string: deleteSettingsURL) {
             NSWorkspace.shared.open(url)
         }
     }
