@@ -157,6 +157,7 @@ final class LaunchModel: ObservableObject {
     @Published var pendingDelete: String?
     @Published var deleteOpen = false
     @Published var deleteNeedsPermission = false
+    var awaitingSettings = false
     var deleteSettingsURL = "x-apple.systempreferences:com.apple.preference.security?Privacy_AppBundles"
     @Published var visible = false
     @Published var launching: String?
@@ -452,10 +453,10 @@ final class LaunchModel: ObservableObject {
                         self.deleteNeedsPermission = true
                         if code == -1743 {
                             self.deleteSettingsURL = "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation"
-                            self.deleteError = "Разрешите Launchpad Classic управлять Finder (раздел «Автоматизация») и повторите. После выдачи разрешения перезапустите приложение."
+                            self.deleteError = "Разрешите Launchpad Classic управлять Finder (раздел «Автоматизация») и вернитесь сюда: приложение перезапустится само, и разрешение заработает."
                         } else {
                             self.deleteSettingsURL = "x-apple.systempreferences:com.apple.preference.security?Privacy_AppBundles"
-                            self.deleteError = "Не удалось удалить: \(text)\nЕсли дело в правах — включите Launchpad Classic в «Управлении приложениями» и перезапустите приложение."
+                            self.deleteError = "Не удалось удалить: \(text)\nЕсли дело в правах — включите Launchpad Classic в «Управлении приложениями» и вернитесь сюда: приложение перезапустится само, и разрешение заработает."
                         }
                     }
                 }
@@ -467,6 +468,7 @@ final class LaunchModel: ObservableObject {
     func openAppManagementSettings() {
         cancelDelete()
         close()
+        awaitingSettings = true   // когда пользователь вернётся из настроек, приложение перезапустится само
         if let url = URL(string: deleteSettingsURL) {
             NSWorkspace.shared.open(url)
         }

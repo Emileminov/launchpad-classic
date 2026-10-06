@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var optionEdit = false
     private var effectView: NSVisualEffectView!
     private var showGen = 0
+    private var leftForSettings = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -32,7 +33,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return CGPoint(x: p.x, y: w.frame.height - p.y)
         }
         NotificationCenter.default.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
-            self?.hide()
+            guard let self else { return }
+            if self.model.awaitingSettings { self.leftForSettings = true }
+            self.hide()
+        }
+        // Разрешения macOS (Управление приложениями, Автоматизация) применяются только к заново запущенной программе:
+        // когда пользователь вернулся из настроек — перезапускаемся сами.
+        NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            guard let self, self.model.awaitingSettings, self.leftForSettings else { return }
+            self.relaunch()
         }
         show()
     }
@@ -114,6 +123,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.window.orderOut(nil)
             NSApp.deactivate()
         }
+    }
+
+    /// Запускает новую копию и закрывает текущую (после паузы, чтобы старая успела выйти).
+    func relaunch() {
+        let path = Bundle.main.bundlePath.replacingOccurrences(of: "'", with: "'\\''")
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/bin/sh")
+        task.arguments = ["-c", "sleep 0.7; open '\(path)'"]
+        try? task.run()
+        NSApp.terminate(nil)
     }
 
     @objc func toggle() { isShown ? hide() : show() }
