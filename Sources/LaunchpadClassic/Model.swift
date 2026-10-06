@@ -176,6 +176,7 @@ final class LaunchModel: ObservableObject {
 
     let pager = PagerState()
     var catalog: [String: AppInfo] = [:]
+    var hidden = Set<String>()
     var utilityPaths = Set<String>()
     var pageWidth: CGFloat = 1
     var pageSize = 35
@@ -207,7 +208,16 @@ final class LaunchModel: ObservableObject {
         return dir.appendingPathComponent("layout.json")
     }
 
+    private var hiddenURL: URL { saveURL.deletingLastPathComponent().appendingPathComponent("hidden.json") }
+
+    private func saveHidden() {
+        if let data = try? JSONEncoder().encode(hidden.sorted()) { try? data.write(to: hiddenURL, options: .atomic) }
+    }
+
     init() {
+        if let data = try? Data(contentsOf: hiddenURL), let list = try? JSONDecoder().decode([String].self, from: data) {
+            hidden = Set(list)
+        }
         if let data = try? Data(contentsOf: saveURL), let saved = try? JSONDecoder().decode([Item].self, from: data) {
             items = saved
             hasSaved = true
@@ -232,13 +242,13 @@ final class LaunchModel: ObservableObject {
         for it in items {
             switch it {
             case .app(let p):
-                if catalog[p] != nil, seen.insert(p).inserted { result.append(it) }
+                if catalog[p] != nil, !hidden.contains(p), seen.insert(p).inserted { result.append(it) }
             case .folder(var f):
-                f.apps = f.apps.filter { catalog[$0] != nil && seen.insert($0).inserted }
+                f.apps = f.apps.filter { catalog[$0] != nil && !hidden.contains($0) && seen.insert($0).inserted }
                 if !f.apps.isEmpty { result.append(.folder(f)) }
             }
         }
-        let fresh = scanned.filter { !seen.contains($0.path) }
+        let fresh = scanned.filter { !seen.contains($0.path) && !hidden.contains($0.path) }
             .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
         if hasSaved {
             result += fresh.map { .app($0.path) }
@@ -366,6 +376,24 @@ final class LaunchModel: ObservableObject {
 
     func launchFirstResult() {
         if case .app(let p)? = visibleItems.first { launch(p) }
+    }
+
+    /// Убрать приложение из Launchpad, не удаляя с Mac (находится через поиск).
+    func hideApp(_ path: String) {
+        hidden.insert(path)
+        saveHidden()
+        withAnimation(Self.spring) {
+            _ = detach(path)
+            cleanup()
+        }
+        if pendingDelete == path { cancelDelete() }
+    }
+
+    func unhideApp(_ path: String) {
+        hidden.remove(path)
+        saveHidden()
+        withAnimation(Self.spring) { items.append(.app(path)) }
+        save()
     }
 
     func requestDelete(_ path: String) {

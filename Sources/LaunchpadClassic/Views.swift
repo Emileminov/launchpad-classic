@@ -248,7 +248,12 @@ struct TileView: View {
                     switch item {
                     case .app(let p):
                         Button("Показать в Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: p)]) }
-                        if model.isDeletable(p) { Button("Удалить…") { model.requestDelete(p) } }
+                        if model.hidden.contains(p) {
+                            Button("Вернуть в Launchpad") { model.unhideApp(p) }
+                        } else {
+                            Button("Убрать из Launchpad") { model.hideApp(p) }
+                        }
+                        if model.isDeletable(p) { Button("В Корзину…") { model.requestDelete(p) } }
                     case .folder(let f):
                         Button("Разобрать папку") { model.dissolve(f.id) }
                     }
@@ -276,8 +281,8 @@ struct TileView: View {
     }
 
     @ViewBuilder private func deleteBadge(_ vis: CGRect) -> some View {
-        if model.editMode, case .app(let p) = item, model.isDeletable(p) {
-            Button { model.requestDelete(p) } label: {
+        if model.editMode, case .app = item {
+            Button { if case .app(let p) = item { model.requestDelete(p) } } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(.white)
@@ -433,31 +438,40 @@ struct DeleteDialog: View {
                 }
                 .padding(.bottom, 18)
 
-                Text(model.deleteNeedsPermission ? "Нужно разрешение" : "Удалить «\(name)»?")
+                Text(model.deleteNeedsPermission ? "Нужно разрешение" : "Что сделать с «\(name)»?")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(.white)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .padding(.bottom, 6)
-                Text(model.deleteError ?? "Приложение будет перемещено в Корзину.\nЕго можно будет вернуть оттуда.")
+                Text(model.deleteError ?? (model.isDeletable(path) ? "Убрать из Launchpad: приложение останется на Mac, его можно найти через поиск.\nВ Корзину: удалить с Mac, можно вернуть оттуда." : "Системное приложение нельзя удалить. Его можно убрать из Launchpad, оно останется на Mac."))
                     .font(.system(size: 13))
                     .foregroundStyle(model.deleteError == nil ? Color.white.opacity(0.62) : Color(red: 1.0, green: 0.45, blue: 0.4))
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.bottom, 22)
 
-                HStack(spacing: 10) {
-                    Button("Отмена") { model.cancelDelete() }
-                        .buttonStyle(DialogButtonStyle(kind: .cancel))
-                        .keyboardShortcut(.cancelAction)
-                    if model.deleteNeedsPermission {
+                if model.deleteNeedsPermission {
+                    HStack(spacing: 10) {
+                        Button("Отмена") { model.cancelDelete() }
+                            .buttonStyle(DialogButtonStyle(kind: .cancel))
+                            .keyboardShortcut(.cancelAction)
                         Button("Открыть настройки") { model.openAppManagementSettings() }
                             .buttonStyle(DialogButtonStyle(kind: .accent))
                             .keyboardShortcut(.defaultAction)
-                    } else {
-                        Button("Удалить") { model.confirmDelete() }
-                            .buttonStyle(DialogButtonStyle(kind: .destructive))
+                    }
+                } else {
+                    VStack(spacing: 8) {
+                        Button("Убрать из Launchpad") { model.hideApp(path) }
+                            .buttonStyle(DialogButtonStyle(kind: .accent))
                             .keyboardShortcut(.defaultAction)
+                        if model.isDeletable(path) {
+                            Button("В Корзину") { model.confirmDelete() }
+                                .buttonStyle(DialogButtonStyle(kind: .destructive))
+                        }
+                        Button("Отмена") { model.cancelDelete() }
+                            .buttonStyle(DialogButtonStyle(kind: .cancel))
+                            .keyboardShortcut(.cancelAction)
                     }
                 }
             }
