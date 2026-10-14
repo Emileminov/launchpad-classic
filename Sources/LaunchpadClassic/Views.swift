@@ -302,10 +302,11 @@ struct FolderOverlay: View {
     let folder: Folder
     let screen: CGSize
 
-    private func report(_ f: CGRect, _ columns: Int) {
-        model.folderGrid = f
+    /// f — весь контур панели папки; сетка начинается под заголовком, с отступами по бокам и снизу.
+    private func report(_ f: CGRect, _ columns: Int, _ headerH: CGFloat) {
+        model.folderPanel = f
+        model.folderGrid = CGRect(x: f.minX + 40, y: f.minY + headerH, width: f.width - 80, height: f.height - headerH - 40)
         model.folderCols = columns
-        model.folderPanel = CGRect(x: f.minX - 40, y: f.minY - 40 - 54, width: f.width + 80, height: f.height + 80 + 54)
     }
 
     var body: some View {
@@ -321,29 +322,42 @@ struct FolderOverlay: View {
                 .contentShape(Rectangle())
                 .onTapGesture { model.closeFolder() }
 
-            VStack(spacing: 18) {
-                TextField("", text: Binding(get: { folder.name }, set: { model.renameFolder(folder.id, $0) }))
-                    .textFieldStyle(.plain)
-                    .multilineTextAlignment(.center)
-                    .font(.system(size: 28, weight: .light))
-                    .foregroundStyle(.white)
-                    .frame(width: 320)
+            // прокрутка идёт на всю панель и обрезается ровно по её краю; под заголовком иконки плавно гаснут
+            let headerH: CGFloat = 88
+            let panelW = cell.width * CGFloat(columns) + 80
+            let panelH = headerH + cell.height * CGFloat(min(rowCount, 3)) + 40
+            ZStack(alignment: .top) {
                 ScrollView(.vertical, showsIndicators: false) {
                     LazyVGrid(columns: Array(repeating: GridItem(.fixed(cell.width), spacing: 0), count: columns), spacing: 0) {
                         ForEach(folder.apps, id: \.self) { p in
                             TileView(model: model, item: .app(p), metrics: metrics, containerFolder: folder.id)
                         }
                     }
+                    .padding(.horizontal, 40)
                     .animation(LaunchModel.spring, value: folder.apps)
                 }
-                .frame(width: cell.width * CGFloat(columns), height: cell.height * CGFloat(min(rowCount, 3)))
-                .background(GeometryReader { g in
-                    Color.clear
-                        .onAppear { report(g.frame(in: .named("root")), columns) }
-                        .onChange(of: folder.apps.count) { _, _ in report(g.frame(in: .named("root")), columns) }
-                })
+                .contentMargins(.top, headerH, for: .scrollContent)
+                .contentMargins(.bottom, 40, for: .scrollContent)
+                .mask(
+                    VStack(spacing: 0) {
+                        LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom).frame(height: headerH)
+                        Rectangle()
+                    }
+                )
+
+                TextField("", text: Binding(get: { folder.name }, set: { model.renameFolder(folder.id, $0) }))
+                    .textFieldStyle(.plain)
+                    .multilineTextAlignment(.center)
+                    .font(.system(size: 28, weight: .light))
+                    .foregroundStyle(.white)
+                    .frame(width: 320)
+                    .padding(.top, 34)
             }
-            .padding(40)
+            .frame(width: panelW, height: panelH)
+            .clipShape(RoundedRectangle(cornerRadius: 44, style: .continuous))
+            // панель всегда по центру экрана — считаем её рамку, а не снимаем во время анимации раскрытия
+            .onAppear { report(CGRect(x: (screen.width - panelW) / 2, y: (screen.height - panelH) / 2, width: panelW, height: panelH), columns, headerH) }
+            .onChange(of: folder.apps.count) { _, _ in report(CGRect(x: (screen.width - panelW) / 2, y: (screen.height - panelH) / 2, width: panelW, height: panelH), columns, headerH) }
             // содержимое проявляется чуть позже стекла, при закрытии уходит вместе с ним
             .opacity(open ? 1 : 0)
             .animation(open ? .easeOut(duration: 0.26).delay(0.12) : .easeIn(duration: 0.2).delay(0.06), value: open)
